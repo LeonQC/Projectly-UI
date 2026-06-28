@@ -1,16 +1,20 @@
-import React from "react";
+import React, { useState } from "react";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage.jsx";
+import LoginPage from "./pages/auth/LoginPage.jsx";
+import RegisterPage from "./pages/auth/RegisterPage.jsx";
+
 function App() {
-  return (
-    <main className="app-shell">
-      <section className="welcome-panel">
-        <p className="eyebrow">Projectly</p>
-        <h1>Projectly UI</h1>
-        <p className="description">
-          React front-end setup for the Projectly workspace and board management app.
-        </p>
-      </section>
-    </main>
-  );
+  const [page, setPage] = useState("login");
+
+  if (page === "register") {
+    return <RegisterPage onNavigate={setPage} />;
+  }
+
+  if (page === "forgot") {
+    return <ForgotPasswordPage onNavigate={setPage} />;
+  }
+
+  return <LoginPage onNavigate={setPage} />;
 }
 
 export default App;

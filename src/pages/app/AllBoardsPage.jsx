@@ -11,9 +11,9 @@ function BoardTile({ board }) {
   );
 }
 
-function WorkspaceActionButton({ label, children }) {
+function WorkspaceActionButton({ label, children, onClick }) {
   return (
-    <button className="workspace-action-button" type="button">
+    <button className="workspace-action-button" type="button" onClick={onClick}>
       {children}
       <span>{label}</span>
     </button>
@@ -71,7 +71,12 @@ function CreateBoardTile() {
   );
 }
 
-function WorkspaceBoards({ workspace, canCreateBoard = false, showActions = true }) {
+function WorkspaceBoards({
+  workspace,
+  canCreateBoard = false,
+  onOpenWorkspaceBoards,
+  showActions = true,
+}) {
   return (
     <section className="boards-group">
       <header className="workspace-board-header">
@@ -81,7 +86,10 @@ function WorkspaceBoards({ workspace, canCreateBoard = false, showActions = true
         </div>
         {showActions && (
           <div className="workspace-actions" aria-label={`${workspace.name} workspace actions`}>
-            <WorkspaceActionButton label="Boards">
+            <WorkspaceActionButton
+              label="Boards"
+              onClick={() => onOpenWorkspaceBoards(workspace.id)}
+            >
               <BoardsIcon />
             </WorkspaceActionButton>
             <WorkspaceActionButton label="Members">
@@ -103,7 +111,7 @@ function WorkspaceBoards({ workspace, canCreateBoard = false, showActions = true
   );
 }
 
-function AllBoardsPage({ workspaces, guestWorkspaces }) {
+function AllBoardsPage({ workspaces, guestWorkspaces, onOpenWorkspaceBoards }) {
   return (
     <section className="app-content" aria-labelledby="all-boards-title">
       <header className="page-header">
@@ -116,7 +124,12 @@ function AllBoardsPage({ workspaces, guestWorkspaces }) {
         <section className="boards-section" aria-label="Your workspaces">
           <h2 className="boards-section-title">YOUR WORKSPACES</h2>
           {workspaces.map((workspace) => (
-            <WorkspaceBoards canCreateBoard workspace={workspace} key={workspace.id} />
+            <WorkspaceBoards
+              canCreateBoard
+              onOpenWorkspaceBoards={onOpenWorkspaceBoards}
+              workspace={workspace}
+              key={workspace.id}
+            />
           ))}
         </section>
 

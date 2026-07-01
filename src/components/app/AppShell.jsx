@@ -1,14 +1,34 @@
 import React, { useState } from "react";
 import { guestWorkspaces, user, workspaces } from "../../data/mockWorkspaceData.js";
 import AllBoardsPage from "../../pages/app/AllBoardsPage.jsx";
+import WorkspaceBoardsPage from "../../pages/app/WorkspaceBoardsPage.jsx";
 import Sidebar from "./Sidebar.jsx";
 
 function AppShell() {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+  const [activePage, setActivePage] = useState({ name: "all-boards" });
+  const activeWorkspace =
+    workspaces.find((workspace) => workspace.id === activePage.workspaceId) ?? workspaces[0];
+
+  function openAllBoards() {
+    setActivePage({ name: "all-boards" });
+  }
+
+  function openWorkspaceBoards(workspaceId) {
+    setActivePage({ name: "workspace-boards", workspaceId });
+  }
 
   return (
     <main className={`app-layout ${isSidebarVisible ? "" : "is-sidebar-hidden"}`}>
-      {isSidebarVisible && <Sidebar user={user} workspaces={workspaces} />}
+      {isSidebarVisible && (
+        <Sidebar
+          activePage={activePage}
+          onOpenAllBoards={openAllBoards}
+          onOpenWorkspaceBoards={openWorkspaceBoards}
+          user={user}
+          workspaces={workspaces}
+        />
+      )}
       <button
         className="sidebar-toggle-button"
         type="button"
@@ -36,7 +56,15 @@ function AppShell() {
           <path d="M9 5v14" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
         </svg>
       </button>
-      <AllBoardsPage workspaces={workspaces} guestWorkspaces={guestWorkspaces} />
+      {activePage.name === "workspace-boards" ? (
+        <WorkspaceBoardsPage workspace={activeWorkspace} />
+      ) : (
+        <AllBoardsPage
+          guestWorkspaces={guestWorkspaces}
+          onOpenWorkspaceBoards={openWorkspaceBoards}
+          workspaces={workspaces}
+        />
+      )}
     </main>
   );
 }

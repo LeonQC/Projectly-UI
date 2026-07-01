@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-function WorkspaceNavGroup({ title, workspaces, children }) {
+function WorkspaceNavGroup({ activePage, onOpenWorkspaceBoards, title, workspaces, children }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
@@ -20,7 +20,16 @@ function WorkspaceNavGroup({ title, workspaces, children }) {
       {isExpanded && (
         <div className="workspace-list">
           {workspaces.map((workspace) => (
-            <button className="workspace-item" type="button" key={workspace.id}>
+            <button
+              className={`workspace-item ${
+                activePage.name === "workspace-boards" && activePage.workspaceId === workspace.id
+                  ? "is-active"
+                  : ""
+              }`}
+              type="button"
+              key={workspace.id}
+              onClick={() => onOpenWorkspaceBoards(workspace.id)}
+            >
               <span className="workspace-icon">{workspace.name.charAt(0)}</span>
               <span>{workspace.name}</span>
             </button>
@@ -32,7 +41,7 @@ function WorkspaceNavGroup({ title, workspaces, children }) {
   );
 }
 
-function Sidebar({ user, workspaces }) {
+function Sidebar({ activePage, onOpenAllBoards, onOpenWorkspaceBoards, user, workspaces }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
@@ -106,12 +115,21 @@ function Sidebar({ user, workspaces }) {
           Inbox
         </button>
 
-        <button className="sidebar-primary-item is-active" type="button">
+        <button
+          className={`sidebar-primary-item ${activePage.name === "all-boards" ? "is-active" : ""}`}
+          type="button"
+          onClick={onOpenAllBoards}
+        >
           All Boards
         </button>
       </nav>
 
-      <WorkspaceNavGroup title="YOUR WORKSPACES" workspaces={workspaces}>
+      <WorkspaceNavGroup
+        activePage={activePage}
+        onOpenWorkspaceBoards={onOpenWorkspaceBoards}
+        title="YOUR WORKSPACES"
+        workspaces={workspaces}
+      >
         <button className="create-workspace-button" type="button">
           + Create new workspace
         </button>

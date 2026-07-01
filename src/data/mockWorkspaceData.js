@@ -15,7 +15,7 @@ export const workspaces = [
   {
     id: "workspace-2",
     name: "Workspace 2",
-    boards: [{ id: "board-3", name: "Board3" }],
+    boards: [{ id: "board-3", name: "w2-Board1" }],
   },
 ];
 

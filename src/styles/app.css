@@ -188,6 +188,10 @@
   font-weight: 700;
 }
 
+.workspace-item.is-active {
+  background: #e6e7e9;
+}
+
 .workspace-icon {
   width: 26px;
   height: 26px;
@@ -246,6 +250,22 @@
   cursor: pointer;
 }
 
+.create-action-button {
+  min-height: 36px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 13px;
+  color: #44546f;
+  background: #e6e7e9;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.create-action-button:hover {
+  background: #dfe3e8;
+}
+
 .user-menu {
   position: absolute;
   top: 40px;
@@ -301,6 +321,47 @@
 
 .boards-group {
   gap: 14px;
+}
+
+.workspace-page-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 10px;
+}
+
+.workspace-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: -8px 0 20px;
+  border-bottom: 1px solid #dfe1e6;
+}
+
+.workspace-tab {
+  border: 0;
+  border-bottom: 2px solid transparent;
+  padding: 0 12px 10px;
+  color: #626f86;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.workspace-tab:hover {
+  color: #172b4d;
+}
+
+.workspace-tab.is-active {
+  color: #172b4d;
+  border-bottom-color: #7c3aed;
+}
+
+.workspace-board-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
 }
 
 .workspace-board-header {

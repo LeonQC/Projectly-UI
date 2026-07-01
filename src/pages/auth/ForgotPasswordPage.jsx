@@ -15,7 +15,6 @@ function ForgotPasswordPage({ onNavigate }) {
           {
             label: "Email",
             type: "email",
-            defaultValue: "john@example.com",
           },
         ],
         footerText: "Remembered your password?",

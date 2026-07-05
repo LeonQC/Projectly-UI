@@ -5,12 +5,12 @@ function RegisterPage({ onNavigate }) {
   return (
     <AuthLayout
       onNavigate={onNavigate}
-      sideTitle="Create boards with your team."
-      sideText="Register to create workspaces, invite members, and manage boards."
+      sideTitle="Create projects with your team."
+      sideText="Register to create workspaces, invite members, and manage projects."
       form={{
         title: "Create your account",
         subtitle:
-          "Create a workspace account to start organizing boards and cards.",
+          "Create a workspace account to start organizing projects and cards.",
         googleLabel: "Register with Google",
         submitLabel: "Register",
         fields: [

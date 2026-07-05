@@ -1,21 +1,51 @@
 import React, { useState } from "react";
 import { guestWorkspaces, user, workspaces } from "../../data/mockWorkspaceData.js";
-import AllBoardsPage from "../../pages/app/AllBoardsPage.jsx";
-import WorkspaceBoardsPage from "../../pages/app/WorkspaceBoardsPage.jsx";
+import AllProjectsPage from "../../pages/app/AllProjectsPage.jsx";
+import ProjectBacklogPage from "../../pages/app/ProjectBacklogPage.jsx";
+import WorkspaceProjectsPage from "../../pages/app/WorkspaceProjectsPage.jsx";
 import Sidebar from "./Sidebar.jsx";
 
 function AppShell() {
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-  const [activePage, setActivePage] = useState({ name: "all-boards" });
+  const [activePage, setActivePage] = useState({ name: "all-projects" });
+  const [archivedProjectIds, setArchivedProjectIds] = useState([]);
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activePage.workspaceId) ?? workspaces[0];
+  const allProjects = workspaces.flatMap((workspace) => workspace.projects);
+  const activeProject =
+    allProjects.find((project) => project.id === activePage.projectId) ?? allProjects[0];
+  const activeProjectWorkspace =
+    workspaces.find((workspace) =>
+      workspace.projects.some((project) => project.id === activeProject.id)
+    ) ?? workspaces[0];
+  function archiveProject(projectId) {
+    setArchivedProjectIds((projectIds) =>
+      projectIds.includes(projectId) ? projectIds : [...projectIds, projectId]
+    );
 
-  function openAllBoards() {
-    setActivePage({ name: "all-boards" });
+    const projectWorkspace = workspaces.find((workspace) =>
+      workspace.projects.some((project) => project.id === projectId)
+    );
+
+    if (projectWorkspace) {
+      setActivePage({
+        name: "workspace-projects",
+        workspaceId: projectWorkspace.id,
+        workspaceTab: "archived-projects",
+      });
+    }
   }
 
-  function openWorkspaceBoards(workspaceId) {
-    setActivePage({ name: "workspace-boards", workspaceId });
+  function openAllProjects() {
+    setActivePage({ name: "all-projects" });
+  }
+
+  function openWorkspaceProjects(workspaceId) {
+    setActivePage({ name: "workspace-projects", workspaceId });
+  }
+
+  function openProject(projectId) {
+    setActivePage({ name: "project-backlog", projectId });
   }
 
   return (
@@ -23,8 +53,8 @@ function AppShell() {
       {isSidebarVisible && (
         <Sidebar
           activePage={activePage}
-          onOpenAllBoards={openAllBoards}
-          onOpenWorkspaceBoards={openWorkspaceBoards}
+          onOpenAllProjects={openAllProjects}
+          onOpenWorkspaceProjects={openWorkspaceProjects}
           user={user}
           workspaces={workspaces}
         />
@@ -56,12 +86,25 @@ function AppShell() {
           <path d="M9 5v14" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
         </svg>
       </button>
-      {activePage.name === "workspace-boards" ? (
-        <WorkspaceBoardsPage workspace={activeWorkspace} />
+      {activePage.name === "project-backlog" ? (
+        <ProjectBacklogPage
+          onArchiveProject={archiveProject}
+          project={activeProject}
+          workspace={activeProjectWorkspace}
+        />
+      ) : activePage.name === "workspace-projects" ? (
+        <WorkspaceProjectsPage
+          archivedProjectIds={archivedProjectIds}
+          initialTab={activePage.workspaceTab}
+          onArchiveProject={archiveProject}
+          onOpenProject={openProject}
+          workspace={activeWorkspace}
+        />
       ) : (
-        <AllBoardsPage
+        <AllProjectsPage
           guestWorkspaces={guestWorkspaces}
-          onOpenWorkspaceBoards={openWorkspaceBoards}
+          onOpenProject={openProject}
+          onOpenWorkspaceProjects={openWorkspaceProjects}
           workspaces={workspaces}
         />
       )}

@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-function WorkspaceNavGroup({ activePage, onOpenWorkspaceBoards, title, workspaces, children }) {
+function WorkspaceNavGroup({ activePage, onOpenWorkspaceProjects, title, workspaces, children }) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   return (
@@ -14,7 +14,22 @@ function WorkspaceNavGroup({ activePage, onOpenWorkspaceBoards, title, workspace
           aria-expanded={isExpanded}
           onClick={() => setIsExpanded((expanded) => !expanded)}
         >
-          {isExpanded ? "⌄" : "›"}
+          <svg
+            aria-hidden="true"
+            className={`chevron-icon ${isExpanded ? "is-expanded" : ""}`}
+            fill="none"
+            height="16"
+            viewBox="0 0 24 24"
+            width="16"
+          >
+            <path
+              d="m9 6 6 6-6 6"
+              stroke="currentColor"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+            />
+          </svg>
         </button>
       </div>
       {isExpanded && (
@@ -22,13 +37,13 @@ function WorkspaceNavGroup({ activePage, onOpenWorkspaceBoards, title, workspace
           {workspaces.map((workspace) => (
             <button
               className={`workspace-item ${
-                activePage.name === "workspace-boards" && activePage.workspaceId === workspace.id
+                activePage.name === "workspace-projects" && activePage.workspaceId === workspace.id
                   ? "is-active"
                   : ""
               }`}
               type="button"
               key={workspace.id}
-              onClick={() => onOpenWorkspaceBoards(workspace.id)}
+              onClick={() => onOpenWorkspaceProjects(workspace.id)}
             >
               <span className="workspace-icon">{workspace.name.charAt(0)}</span>
               <span>{workspace.name}</span>
@@ -41,7 +56,7 @@ function WorkspaceNavGroup({ activePage, onOpenWorkspaceBoards, title, workspace
   );
 }
 
-function Sidebar({ activePage, onOpenAllBoards, onOpenWorkspaceBoards, user, workspaces }) {
+function Sidebar({ activePage, onOpenAllProjects, onOpenWorkspaceProjects, user, workspaces }) {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const userMenuRef = useRef(null);
 
@@ -78,7 +93,7 @@ function Sidebar({ activePage, onOpenAllBoards, onOpenWorkspaceBoards, user, wor
         <button
           className="icon-button sidebar-search-action"
           type="button"
-          aria-label="Search workspaces and boards"
+          aria-label="Search workspaces and projects"
         >
           <svg
             aria-hidden="true"
@@ -116,17 +131,17 @@ function Sidebar({ activePage, onOpenAllBoards, onOpenWorkspaceBoards, user, wor
         </button>
 
         <button
-          className={`sidebar-primary-item ${activePage.name === "all-boards" ? "is-active" : ""}`}
+          className={`sidebar-primary-item ${activePage.name === "all-projects" ? "is-active" : ""}`}
           type="button"
-          onClick={onOpenAllBoards}
+          onClick={onOpenAllProjects}
         >
-          All Boards
+          All Projects
         </button>
       </nav>
 
       <WorkspaceNavGroup
         activePage={activePage}
-        onOpenWorkspaceBoards={onOpenWorkspaceBoards}
+        onOpenWorkspaceProjects={onOpenWorkspaceProjects}
         title="YOUR WORKSPACES"
         workspaces={workspaces}
       >

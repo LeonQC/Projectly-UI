@@ -1,9 +1,9 @@
 import React from "react";
 
-function BoardTile({ board }) {
+function ProjectTile({ onOpenProject, project }) {
   return (
-    <button className="board-tile" type="button">
-      <span>{board.name}</span>
+    <button className="board-tile" type="button" onClick={() => onOpenProject(project.id)}>
+      <span>{project.name}</span>
       <span className="board-menu" aria-hidden="true">
         ...
       </span>
@@ -20,7 +20,7 @@ function WorkspaceActionButton({ label, children, onClick }) {
   );
 }
 
-function BoardsIcon() {
+function ProjectsIcon() {
   return (
     <svg aria-hidden="true" fill="none" height="16" viewBox="0 0 24 24" width="16">
       <rect height="14" rx="2" stroke="currentColor" strokeWidth="2" width="18" x="3" y="5" />
@@ -63,18 +63,19 @@ function SettingsIcon() {
   );
 }
 
-function CreateBoardTile() {
+function CreateProjectTile() {
   return (
     <button className="create-board-tile" type="button">
-      Create new board
+      Create new project
     </button>
   );
 }
 
-function WorkspaceBoards({
+function WorkspaceProjects({
   workspace,
-  canCreateBoard = false,
-  onOpenWorkspaceBoards,
+  canCreateProject = false,
+  onOpenProject,
+  onOpenWorkspaceProjects,
   showActions = true,
 }) {
   return (
@@ -87,10 +88,10 @@ function WorkspaceBoards({
         {showActions && (
           <div className="workspace-actions" aria-label={`${workspace.name} workspace actions`}>
             <WorkspaceActionButton
-              label="Boards"
-              onClick={() => onOpenWorkspaceBoards(workspace.id)}
+              label="Projects"
+              onClick={() => onOpenWorkspaceProjects(workspace.id)}
             >
-              <BoardsIcon />
+              <ProjectsIcon />
             </WorkspaceActionButton>
             <WorkspaceActionButton label="Members">
               <MembersIcon />
@@ -102,21 +103,21 @@ function WorkspaceBoards({
         )}
       </header>
       <div className="board-grid">
-        {workspace.boards.map((board) => (
-          <BoardTile board={board} key={board.id} />
+        {workspace.projects.map((project) => (
+          <ProjectTile onOpenProject={onOpenProject} project={project} key={project.id} />
         ))}
-        {canCreateBoard && <CreateBoardTile />}
+        {canCreateProject && <CreateProjectTile />}
       </div>
     </section>
   );
 }
 
-function AllBoardsPage({ workspaces, guestWorkspaces, onOpenWorkspaceBoards }) {
+function AllProjectsPage({ workspaces, guestWorkspaces, onOpenProject, onOpenWorkspaceProjects }) {
   return (
-    <section className="app-content" aria-labelledby="all-boards-title">
+    <section className="app-content" aria-labelledby="all-projects-title">
       <header className="page-header">
         <div>
-          <h1 id="all-boards-title">All Boards</h1>
+          <h1 id="all-projects-title">All Projects</h1>
         </div>
       </header>
 
@@ -124,9 +125,10 @@ function AllBoardsPage({ workspaces, guestWorkspaces, onOpenWorkspaceBoards }) {
         <section className="boards-section" aria-label="Your workspaces">
           <h2 className="boards-section-title">YOUR WORKSPACES</h2>
           {workspaces.map((workspace) => (
-            <WorkspaceBoards
-              canCreateBoard
-              onOpenWorkspaceBoards={onOpenWorkspaceBoards}
+            <WorkspaceProjects
+              canCreateProject
+              onOpenProject={onOpenProject}
+              onOpenWorkspaceProjects={onOpenWorkspaceProjects}
               workspace={workspace}
               key={workspace.id}
             />
@@ -136,7 +138,12 @@ function AllBoardsPage({ workspaces, guestWorkspaces, onOpenWorkspaceBoards }) {
         <section className="boards-section" aria-label="Guest workspaces">
           <h2 className="boards-section-title">GUEST WORKSPACES</h2>
           {guestWorkspaces.map((workspace) => (
-            <WorkspaceBoards showActions={false} workspace={workspace} key={workspace.id} />
+            <WorkspaceProjects
+              onOpenProject={onOpenProject}
+              showActions={false}
+              workspace={workspace}
+              key={workspace.id}
+            />
           ))}
         </section>
       </div>
@@ -144,4 +151,4 @@ function AllBoardsPage({ workspaces, guestWorkspaces, onOpenWorkspaceBoards }) {
   );
 }
 
-export default AllBoardsPage;
+export default AllProjectsPage;

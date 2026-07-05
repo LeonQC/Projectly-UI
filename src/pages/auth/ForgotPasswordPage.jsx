@@ -5,7 +5,7 @@ function ForgotPasswordPage({ onNavigate }) {
   return (
     <AuthLayout
       onNavigate={onNavigate}
-      sideTitle="Get back to your boards."
+      sideTitle="Get back to your projects."
       sideText="Reset your password and continue managing your project work."
       form={{
         title: "Forgot password",

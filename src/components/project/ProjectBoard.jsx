@@ -162,12 +162,18 @@ function BoardColumn({ cards, onCardDragStart, onDropCard, onOpenCard, onStatusC
   );
 }
 
-function ProjectBoard({ boardColumns, onOpenCard, onStatusChange }) {
-  const [customStatuses, setCustomStatuses] = useState([]);
+function ProjectBoard({
+  boardCards = [],
+  boardColumns,
+  onCreateStatus,
+  onOpenCard,
+  onStatusChange,
+  statuses = cardStatuses,
+}) {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [newStatusTitle, setNewStatusTitle] = useState("");
-  const statuses = [...cardStatuses, ...customStatuses];
-  const allBoardCards = boardColumns.flatMap((column) => column.cards);
+  const boardColumnStatuses = boardColumns.map((column) => column.status);
+  const extraStatuses = statuses.filter((status) => !boardColumnStatuses.includes(status.value));
 
   function createStatus(event) {
     event.preventDefault();
@@ -176,13 +182,7 @@ function ProjectBoard({ boardColumns, onOpenCard, onStatusChange }) {
       return;
     }
 
-    setCustomStatuses((currentStatuses) => [
-      ...currentStatuses,
-      {
-        label: newStatusTitle.trim(),
-        value: newStatusTitle.trim().toLowerCase().replace(/\s+/g, "-"),
-      },
-    ]);
+    onCreateStatus(newStatusTitle.trim());
     setNewStatusTitle("");
     setIsStatusModalOpen(false);
   }
@@ -223,9 +223,9 @@ function ProjectBoard({ boardColumns, onOpenCard, onStatusChange }) {
             key={column.title}
           />
         ))}
-        {customStatuses.map((status) => (
+        {extraStatuses.map((status) => (
           <BoardColumn
-            cards={allBoardCards.filter((card) => card.status === status.value)}
+            cards={boardCards.filter((card) => card.status === status.value)}
             onCardDragStart={handleCardDragStart}
             onDropCard={handleDropCard}
             onOpenCard={onOpenCard}

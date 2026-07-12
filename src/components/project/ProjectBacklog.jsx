@@ -19,6 +19,7 @@ function EpicSprint({
   sprintMoveActions,
   sprintStatusCounts,
   sprintStartDisabled,
+  statuses,
 }) {
   const sprint = epic.sprints?.find((epicSprint) => !epicSprint.archived) ?? null;
   const sprintCards = sprint?.cards ?? [];
@@ -122,6 +123,7 @@ function EpicSprint({
                     onDragStart={(event) => onCardDragStart(event, card.id)}
                     onOpenCard={onOpenCard}
                     onStatusChange={onStatusChange}
+                    statuses={statuses}
                     key={card.id}
                   />
                 ))
@@ -151,6 +153,7 @@ function EpicBlock({
   onToggleEpicMenu,
   epicMenuRef,
   selected,
+  statuses,
 }) {
   return (
     <article className={`epic-block ${selected ? "is-selected" : ""}`}>
@@ -212,6 +215,7 @@ function EpicBlock({
             card={card}
             onOpenCard={onOpenCard}
             onStatusChange={onStatusChange}
+            statuses={statuses}
             key={card.id}
           />
         ))}
@@ -252,6 +256,7 @@ function ProjectBacklog({
   onToggleSprintMenu,
   selectedEpicId,
   sprintMenuRef,
+  statuses,
 }) {
   const selectedEpic = epics.find((epic) => epic.id === selectedEpicId) ?? null;
 
@@ -279,6 +284,7 @@ function ProjectBacklog({
                 onSelectEpic={onSelectEpic}
                 onToggleEpicMenu={onToggleEpicMenu}
                 onStatusChange={onStatusChange}
+                statuses={statuses}
                 selected={selectedEpicId === epic.id}
                 key={epic.id}
               />
@@ -321,6 +327,7 @@ function ProjectBacklog({
               sprintMoveActions={getSprintMoveActions(selectedEpic)}
               sprintStartDisabled={getSprintStartDisabled(selectedEpic)}
               sprintStatusCounts={getSprintStatusCounts(selectedEpic)}
+              statuses={statuses}
             />
           ) : (
             <p className="empty-state">Select an epic to view its sprint.</p>
@@ -351,6 +358,7 @@ function ProjectBacklog({
                   onDragStart={(event) => onCardDragStart(event, card.id)}
                   onOpenCard={onOpenCard}
                   onStatusChange={onStatusChange}
+                  statuses={statuses}
                   key={card.id}
                 />
               ))

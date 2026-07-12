@@ -5,7 +5,7 @@ import CreateEpicModal from "../../components/project/CreateEpicModal.jsx";
 import CreateSprintModal from "../../components/project/CreateSprintModal.jsx";
 import ProjectBacklog from "../../components/project/ProjectBacklog.jsx";
 import ProjectArchivedWorkItems from "../../components/project/ProjectArchivedWorkItems.jsx";
-import ProjectBoard from "../../components/project/ProjectBoard.jsx";
+import ProjectBoard, { cardStatuses } from "../../components/project/ProjectBoard.jsx";
 import ProjectMembers from "../../components/project/ProjectMembers.jsx";
 import ProjectSettings from "../../components/project/ProjectSettings.jsx";
 import ProjectSummary from "../../components/project/ProjectSummary.jsx";
@@ -45,6 +45,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   const [createdCards, setCreatedCards] = useState([]);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
+  const [customStatuses, setCustomStatuses] = useState([]);
   const sprintMenuRef = useRef(null);
   const epicMenuRef = useRef(null);
   const epics = localEpics.filter((epic) => !epic.archived);
@@ -122,6 +123,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       cards: startedSprintCards.filter((card) => card.status === "done" || card.completed),
     },
   ];
+  const statusOptions = [...cardStatuses, ...customStatuses];
   const projectMembers = [
     ...(workspace.members ?? []),
     ...(workspace.singleBoardGuests ?? []).filter((guest) => guest.projects.includes(project.name)),
@@ -369,26 +371,52 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   }
 
   function updateCardStatus(cardId, status) {
+    const statusLabel = statusOptions.find((option) => option.value === status)?.label ?? formatStatusLabel(status);
+
     setCreatedCards((cards) =>
-      cards.map((card) => (card.id === cardId ? { ...card, listName: formatStatusLabel(status), status } : card))
+      cards.map((card) => (card.id === cardId ? { ...card, listName: statusLabel, status } : card))
     );
     setLocalEpics((currentEpics) =>
       currentEpics.map((epic) => ({
         ...epic,
         cards: epic.cards.map((card) =>
-          card.id === cardId ? { ...card, listName: formatStatusLabel(status), status } : card
+          card.id === cardId ? { ...card, listName: statusLabel, status } : card
         ),
         sprints: (epic.sprints ?? []).map((epicSprint) => ({
           ...epicSprint,
           cards: epicSprint.cards.map((card) =>
-            card.id === cardId ? { ...card, listName: formatStatusLabel(status), status } : card
+            card.id === cardId ? { ...card, listName: statusLabel, status } : card
           ),
         })),
       }))
     );
     setSelectedCard((card) =>
-      card?.id === cardId ? { ...card, listName: formatStatusLabel(status), status } : card
+      card?.id === cardId ? { ...card, listName: statusLabel, status } : card
     );
+  }
+
+  function createCustomStatus(title) {
+    const statusLabel = title.trim();
+
+    if (!statusLabel) {
+      return null;
+    }
+
+    const statusValue = statusLabel.toLowerCase().replace(/\s+/g, "-");
+    const existingStatus = statusOptions.find((status) => status.value === statusValue);
+
+    if (existingStatus) {
+      return existingStatus;
+    }
+
+    const newStatus = {
+      label: statusLabel,
+      value: statusValue,
+    };
+
+    setCustomStatuses((currentStatuses) => [...currentStatuses, newStatus]);
+
+    return newStatus;
   }
 
   function handleCardDragStart(event, cardId) {
@@ -519,9 +547,12 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
         />
       ) : activeTab === "Board" ? (
         <ProjectBoard
+          boardCards={startedSprintCards}
           boardColumns={boardColumns}
+          onCreateStatus={createCustomStatus}
           onOpenCard={setSelectedCard}
           onStatusChange={updateCardStatus}
+          statuses={statusOptions}
         />
       ) : activeTab === "Archived Work Items" ? (
         <ProjectArchivedWorkItems
@@ -617,6 +648,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           }}
           selectedEpicId={activeSprintEpicId}
           sprintMenuRef={sprintMenuRef}
+          statuses={statusOptions}
           getSprintStartDisabled={(epic) => {
             const epicSprint = epic.sprints?.find((currentSprint) => !currentSprint.archived);
             const epicSprintCards = epicSprint?.cards ?? [];
@@ -789,9 +821,11 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           linkedWorkItemOptions={linkedWorkItemOptions}
           onArchiveCard={archiveCard}
           onClose={() => setSelectedCard(null)}
+          onCreateStatus={createCustomStatus}
           onStatusChange={updateCardStatus}
           projectMembers={projectMembers}
           sprintOptions={sprintOptions}
+          statuses={statusOptions}
         />
       )}
     </section>

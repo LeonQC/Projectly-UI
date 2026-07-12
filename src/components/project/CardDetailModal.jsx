@@ -28,13 +28,14 @@ function CardDetailModal({
   linkedWorkItemOptions = [],
   onArchiveCard,
   onClose,
+  onCreateStatus,
   onStatusChange,
   projectMembers = [],
   sprintOptions = [],
+  statuses = defaultCardStatuses,
 }) {
   const [activeTab, setActiveTab] = useState("Members");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [statuses, setStatuses] = useState(defaultCardStatuses);
   const [sprintId, setSprintId] = useState(card.sprintId ?? "backlog");
   const [linkedRelation, setLinkedRelation] = useState(workItemRelations[0]);
   const [linkedCardId, setLinkedCardId] = useState("");
@@ -132,13 +133,11 @@ function CardDetailModal({
       return;
     }
 
-    const newStatus = {
-      label: newStatusTitle.trim(),
-      value: newStatusTitle.trim().toLowerCase().replace(/\s+/g, "-"),
-    };
+    const newStatus = onCreateStatus?.(newStatusTitle.trim());
 
-    setStatuses((currentStatuses) => [...currentStatuses, newStatus]);
-    onStatusChange?.(card.id, newStatus.value);
+    if (newStatus?.value) {
+      onStatusChange?.(card.id, newStatus.value);
+    }
     setNewStatusTitle("");
     setIsStatusMenuOpen(false);
     setIsStatusModalOpen(false);

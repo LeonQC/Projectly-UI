@@ -45,7 +45,8 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   const [createdCards, setCreatedCards] = useState([]);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
-  const [customStatuses, setCustomStatuses] = useState([]);
+  const [projectStatuses, setProjectStatuses] = useState(cardStatuses);
+  const [archivedStatusValues, setArchivedStatusValues] = useState([]);
   const sprintMenuRef = useRef(null);
   const epicMenuRef = useRef(null);
   const epics = localEpics.filter((epic) => !epic.archived);
@@ -110,20 +111,18 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     inProgress: sprintCards.filter((card) => card.status === "in-progress").length,
     done: sprintCards.filter((card) => card.status === "done" || card.completed).length,
   };
-  const boardColumns = [
-    { title: "Todo", status: "todo", cards: startedSprintCards.filter((card) => card.status === "todo") },
-    {
-      title: "In Progress",
-      status: "in-progress",
-      cards: startedSprintCards.filter((card) => card.status === "in-progress"),
-    },
-    {
-      title: "Done",
-      status: "done",
-      cards: startedSprintCards.filter((card) => card.status === "done" || card.completed),
-    },
-  ];
-  const statusOptions = [...cardStatuses, ...customStatuses];
+  const statusOptions = projectStatuses.filter((status) => !archivedStatusValues.includes(status.value));
+  const boardColumns = statusOptions
+    .filter((status) => cardStatuses.some((defaultStatus) => defaultStatus.value === status.value))
+    .map((status) => ({
+      title: status.label,
+      status: status.value,
+      cards: startedSprintCards.filter((card) =>
+        status.value === "done"
+          ? card.status === status.value || card.completed
+          : card.status === status.value
+      ),
+    }));
   const projectMembers = [
     ...(workspace.members ?? []),
     ...(workspace.singleBoardGuests ?? []).filter((guest) => guest.projects.includes(project.name)),
@@ -371,7 +370,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   }
 
   function updateCardStatus(cardId, status) {
-    const statusLabel = statusOptions.find((option) => option.value === status)?.label ?? formatStatusLabel(status);
+    const statusLabel = projectStatuses.find((option) => option.value === status)?.label ?? formatStatusLabel(status);
 
     setCreatedCards((cards) =>
       cards.map((card) => (card.id === cardId ? { ...card, listName: statusLabel, status } : card))
@@ -403,9 +402,12 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     }
 
     const statusValue = statusLabel.toLowerCase().replace(/\s+/g, "-");
-    const existingStatus = statusOptions.find((status) => status.value === statusValue);
+    const existingStatus = projectStatuses.find((status) => status.value === statusValue);
 
     if (existingStatus) {
+      setArchivedStatusValues((currentValues) =>
+        currentValues.filter((currentValue) => currentValue !== existingStatus.value)
+      );
       return existingStatus;
     }
 
@@ -414,9 +416,23 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       value: statusValue,
     };
 
-    setCustomStatuses((currentStatuses) => [...currentStatuses, newStatus]);
+    setProjectStatuses((currentStatuses) => [...currentStatuses, newStatus]);
 
     return newStatus;
+  }
+
+  function editStatus(statusValue, statusLabel) {
+    setProjectStatuses((currentStatuses) =>
+      currentStatuses.map((status) =>
+        status.value === statusValue ? { ...status, label: statusLabel.trim() || status.label } : status
+      )
+    );
+  }
+
+  function archiveStatus(statusValue) {
+    setArchivedStatusValues((currentValues) =>
+      currentValues.includes(statusValue) ? currentValues : [...currentValues, statusValue]
+    );
   }
 
   function handleCardDragStart(event, cardId) {
@@ -549,7 +565,9 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
         <ProjectBoard
           boardCards={startedSprintCards}
           boardColumns={boardColumns}
+          onArchiveStatus={archiveStatus}
           onCreateStatus={createCustomStatus}
+          onEditStatus={editStatus}
           onOpenCard={setSelectedCard}
           onStatusChange={updateCardStatus}
           statuses={statusOptions}

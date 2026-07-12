@@ -111,8 +111,37 @@ export function WorkItemCard({
   );
 }
 
-function BoardColumn({ cards, onCardDragStart, onDropCard, onOpenCard, onStatusChange, status, statuses, title }) {
+function BoardColumn({
+  cards,
+  onArchiveStatus,
+  onCardDragStart,
+  onDropCard,
+  onEditStatus,
+  onOpenCard,
+  onStatusChange,
+  status,
+  statuses,
+  title,
+}) {
   const [isDragOver, setIsDragOver] = useState(false);
+  const [isStatusMenuOpen, setIsStatusMenuOpen] = useState(false);
+  const statusMenuRef = useRef(null);
+
+  useEffect(() => {
+    function closeStatusMenuOnOutsideClick(event) {
+      if (!statusMenuRef.current || statusMenuRef.current.contains(event.target)) {
+        return;
+      }
+
+      setIsStatusMenuOpen(false);
+    }
+
+    document.addEventListener("mousedown", closeStatusMenuOnOutsideClick);
+
+    return () => {
+      document.removeEventListener("mousedown", closeStatusMenuOnOutsideClick);
+    };
+  }, []);
 
   return (
     <section
@@ -138,7 +167,44 @@ function BoardColumn({ cards, onCardDragStart, onDropCard, onOpenCard, onStatusC
     >
       <header className="board-column-header">
         <h3>{title}</h3>
-        <span>{cards.length}</span>
+        <div className="board-column-header-actions">
+          <span>{cards.length}</span>
+          <div className="status-menu-wrapper" ref={statusMenuRef}>
+            <button
+              className="icon-button status-menu-button"
+              type="button"
+              aria-label={`Open ${title} status menu`}
+              aria-expanded={isStatusMenuOpen}
+              onClick={() => setIsStatusMenuOpen((isOpen) => !isOpen)}
+            >
+              ...
+            </button>
+            {isStatusMenuOpen && (
+              <div className="sprint-menu status-column-menu" role="menu">
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsStatusMenuOpen(false);
+                    onEditStatus(status, title);
+                  }}
+                >
+                  Edit status
+                </button>
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setIsStatusMenuOpen(false);
+                    onArchiveStatus(status);
+                  }}
+                >
+                  Archive status
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
       </header>
       <div className="board-column-cards">
         {cards.length > 0 ? (
@@ -165,12 +231,15 @@ function BoardColumn({ cards, onCardDragStart, onDropCard, onOpenCard, onStatusC
 function ProjectBoard({
   boardCards = [],
   boardColumns,
+  onArchiveStatus,
   onCreateStatus,
+  onEditStatus,
   onOpenCard,
   onStatusChange,
   statuses = cardStatuses,
 }) {
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
+  const [editingStatus, setEditingStatus] = useState(null);
   const [newStatusTitle, setNewStatusTitle] = useState("");
   const boardColumnStatuses = boardColumns.map((column) => column.status);
   const extraStatuses = statuses.filter((status) => !boardColumnStatuses.includes(status.value));
@@ -185,6 +254,18 @@ function ProjectBoard({
     onCreateStatus(newStatusTitle.trim());
     setNewStatusTitle("");
     setIsStatusModalOpen(false);
+  }
+
+  function updateStatus(event) {
+    event.preventDefault();
+
+    if (!editingStatus || !newStatusTitle.trim()) {
+      return;
+    }
+
+    onEditStatus(editingStatus.value, newStatusTitle.trim());
+    setEditingStatus(null);
+    setNewStatusTitle("");
   }
 
   function handleCardDragStart(event, cardId) {
@@ -213,8 +294,13 @@ function ProjectBoard({
         {boardColumns.map((column) => (
           <BoardColumn
             cards={column.cards}
+            onArchiveStatus={onArchiveStatus}
             onCardDragStart={handleCardDragStart}
             onDropCard={handleDropCard}
+            onEditStatus={(statusValue, statusLabel) => {
+              setEditingStatus({ value: statusValue, label: statusLabel });
+              setNewStatusTitle(statusLabel);
+            }}
             onOpenCard={onOpenCard}
             onStatusChange={onStatusChange}
             status={column.status}
@@ -226,8 +312,13 @@ function ProjectBoard({
         {extraStatuses.map((status) => (
           <BoardColumn
             cards={boardCards.filter((card) => card.status === status.value)}
+            onArchiveStatus={onArchiveStatus}
             onCardDragStart={handleCardDragStart}
             onDropCard={handleDropCard}
+            onEditStatus={(statusValue, statusLabel) => {
+              setEditingStatus({ value: statusValue, label: statusLabel });
+              setNewStatusTitle(statusLabel);
+            }}
             onOpenCard={onOpenCard}
             onStatusChange={onStatusChange}
             status={status.value}
@@ -271,6 +362,56 @@ function ProjectBoard({
                 </button>
                 <button className="modal-update-button" type="submit">
                   Create
+                </button>
+              </footer>
+            </form>
+          </section>
+        </div>
+      )}
+      {editingStatus && (
+        <div className="modal-backdrop" role="presentation">
+          <section className="simple-modal" aria-labelledby="edit-status-title" role="dialog" aria-modal="true">
+            <header className="simple-modal-header">
+              <h2 id="edit-status-title">Edit status</h2>
+              <button
+                className="modal-close-button"
+                type="button"
+                aria-label="Close edit status modal"
+                onClick={() => {
+                  setEditingStatus(null);
+                  setNewStatusTitle("");
+                }}
+              >
+                <svg aria-hidden="true" fill="none" height="20" viewBox="0 0 24 24" width="20">
+                  <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                </svg>
+              </button>
+            </header>
+            <form className="simple-modal-form" onSubmit={updateStatus}>
+              <label className="modal-field">
+                <strong>
+                  Status name <span className="required-mark">*</span>
+                </strong>
+                <input
+                  type="text"
+                  value={newStatusTitle}
+                  onChange={(event) => setNewStatusTitle(event.target.value)}
+                  autoFocus
+                />
+              </label>
+              <footer className="sprint-modal-footer">
+                <button
+                  className="modal-cancel-button"
+                  type="button"
+                  onClick={() => {
+                    setEditingStatus(null);
+                    setNewStatusTitle("");
+                  }}
+                >
+                  Cancel
+                </button>
+                <button className="modal-update-button" type="submit">
+                  Save
                 </button>
               </footer>
             </form>

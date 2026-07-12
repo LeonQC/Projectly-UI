@@ -1044,7 +1044,7 @@
 :root[data-theme="dark"] .inbox-item,
 :root[data-theme="dark"] .create-workspace-button,
 :root[data-theme="dark"] .create-action-button,
-:root[data-theme="dark"] .board-column-header span,
+:root[data-theme="dark"] .board-column-header-actions > span,
 :root[data-theme="dark"] .sidebar-primary-item.is-active,
 :root[data-theme="dark"] .workspace-item.is-active {
   background: #243044;
@@ -1818,7 +1818,14 @@
   font-size: 14px;
 }
 
-.board-column-header span {
+.board-column-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  position: relative;
+}
+
+.board-column-header-actions > span {
   display: grid;
   min-width: 22px;
   height: 22px;
@@ -1828,6 +1835,16 @@
   background: #e9edf3;
   font-size: 12px;
   font-weight: 800;
+}
+
+.status-menu-wrapper {
+  position: relative;
+}
+
+.status-column-menu {
+  right: 0;
+  left: auto;
+  min-width: 140px;
 }
 
 .board-column-cards {

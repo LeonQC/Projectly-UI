@@ -959,7 +959,8 @@
 :root[data-theme="dark"] .page-tabs,
 :root[data-theme="dark"] .project-tabs,
 :root[data-theme="dark"] .workspace-tabs,
-:root[data-theme="dark"] .card-detail-header {
+:root[data-theme="dark"] .card-detail-header,
+:root[data-theme="dark"] .card-detail-side {
   border-color: #263244;
 }
 
@@ -977,7 +978,11 @@
 :root[data-theme="dark"] .card-title-row h2,
 :root[data-theme="dark"] .linked-work-items-section h3,
 :root[data-theme="dark"] .card-description-section h3,
-:root[data-theme="dark"] .card-detail-side summary {
+:root[data-theme="dark"] .card-development-section h3,
+:root[data-theme="dark"] .comments-activity-panel h3,
+:root[data-theme="dark"] .comment-composer-header,
+:root[data-theme="dark"] .comment-item strong,
+:root[data-theme="dark"] .mention-menu strong {
   color: #f8fafc;
 }
 
@@ -988,7 +993,12 @@
 :root[data-theme="dark"] .inbox-item-meta,
 :root[data-theme="dark"] .card-list-field,
 :root[data-theme="dark"] .card-status-field,
-:root[data-theme="dark"] .card-description-section p {
+:root[data-theme="dark"] .card-description-section p,
+:root[data-theme="dark"] .card-development-section > p,
+:root[data-theme="dark"] .comment-item p,
+:root[data-theme="dark"] .comment-item header span,
+:root[data-theme="dark"] .mention-menu small,
+:root[data-theme="dark"] .comment-attachment-chip small {
   color: #94a3b8;
 }
 
@@ -1026,7 +1036,10 @@
 :root[data-theme="dark"] .simple-modal,
 :root[data-theme="dark"] .card-detail-modal,
 :root[data-theme="dark"] .card-tab-panel,
-:root[data-theme="dark"] .card-detail-side details,
+:root[data-theme="dark"] .card-development-section > p,
+:root[data-theme="dark"] .mention-menu,
+:root[data-theme="dark"] .comment-attachment-chip,
+:root[data-theme="dark"] .comment-item-attachments span,
 :root[data-theme="dark"] .selected-member-list,
 :root[data-theme="dark"] .selected-label-list {
   border-color: #263244;
@@ -1068,6 +1081,7 @@
 :root[data-theme="dark"] .card-member-editor input,
 :root[data-theme="dark"] .label-create-row input,
 :root[data-theme="dark"] .label-create-row select,
+:root[data-theme="dark"] .comment-editor textarea,
 :root[data-theme="dark"] .sprint-date-grid input,
 :root[data-theme="dark"] input,
 :root[data-theme="dark"] textarea,
@@ -1081,8 +1095,15 @@
 :root[data-theme="dark"] .user-menu button,
 :root[data-theme="dark"] .project-dropdown-menu button,
 :root[data-theme="dark"] .guest-project-dropdown button,
-:root[data-theme="dark"] .card-status-dropdown button {
+:root[data-theme="dark"] .card-status-dropdown button,
+:root[data-theme="dark"] .mention-menu button,
+:root[data-theme="dark"] .comment-attachment-chip {
   color: #dbe4f0;
+}
+
+:root[data-theme="dark"] .mention-menu button:hover,
+:root[data-theme="dark"] .comment-attachment-chip button:hover {
+  background: #334155;
 }
 
 :root[data-theme="dark"] .drop-zone:hover {
@@ -2039,14 +2060,11 @@
 .card-detail-modal {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  align-content: start;
-  width: min(920px, 100%);
-  min-height: min(760px, calc(100vh - 48px));
-  max-height: calc(100vh - 48px);
-  overflow: auto;
+  width: min(1120px, calc(100vw - 56px));
+  height: min(680px, calc(100vh - 56px));
+  overflow: hidden;
   border-radius: 8px;
   background: #ffffff;
-  padding: 20px;
   box-shadow: 0 24px 60px rgba(9, 30, 66, 0.24);
 }
 
@@ -2056,7 +2074,7 @@
   justify-content: space-between;
   gap: 18px;
   border-bottom: 1px solid #dfe1e6;
-  padding-bottom: 6px;
+  padding: 16px 20px 10px;
 }
 
 .card-detail-meta {
@@ -2157,9 +2175,11 @@ select.card-status-select {
 
 .card-detail-body {
   display: grid;
-  grid-template-columns: minmax(0, 1.3fr) minmax(240px, 0.7fr);
-  gap: 22px;
-  padding-top: 12px;
+  grid-template-columns: minmax(0, 1.35fr) minmax(320px, 0.65fr);
+  gap: 0;
+  min-height: 0;
+  overflow: hidden;
+  padding: 16px 20px;
 }
 
 .card-detail-main,
@@ -2167,6 +2187,17 @@ select.card-status-select {
   display: grid;
   align-content: start;
   gap: 16px;
+  min-height: 0;
+  overflow: auto;
+}
+
+.card-detail-main {
+  padding-right: 22px;
+}
+
+.card-detail-side {
+  border-left: 1px solid #dfe1e6;
+  padding-left: 22px;
 }
 
 .card-title-row {
@@ -2471,25 +2502,31 @@ select.card-status-select {
   font-size: 13px;
 }
 
-.card-description-section {
+.card-description-section,
+.card-development-section {
   display: grid;
   gap: 8px;
 }
 
-.card-description-section header {
+.card-description-section header,
+.card-development-section header,
+.comments-activity-panel header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
 }
 
-.card-description-section h3 {
+.card-description-section h3,
+.card-development-section h3,
+.comments-activity-panel h3 {
   margin: 0;
   color: #172b4d;
   font-size: 15px;
 }
 
-.card-description-section p {
+.card-description-section p,
+.card-development-section > p {
   min-height: 90px;
   margin: 0;
   border: 1px solid #dfe1e6;
@@ -2500,17 +2537,239 @@ select.card-status-select {
   line-height: 1.5;
 }
 
-.card-detail-side details {
-  border: 1px solid #dfe1e6;
-  border-radius: 8px;
-  padding: 12px;
+.comments-activity-panel {
+  display: grid;
+  align-content: start;
+  gap: 12px;
 }
 
-.card-detail-side summary {
+.comment-composer {
+  display: grid;
+  gap: 10px;
+}
+
+.comment-composer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   color: #172b4d;
-  font-size: 14px;
-  font-weight: 800;
+  font-size: 13px;
+}
+
+.comment-editor {
+  position: relative;
+}
+
+.comment-editor textarea {
+  width: 100%;
+  min-height: 110px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 10px;
+  color: #172b4d;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.mention-menu {
+  position: absolute;
+  z-index: 25;
+  right: 8px;
+  left: 8px;
+  bottom: 8px;
+  display: grid;
+  max-height: 174px;
+  overflow: auto;
+  border: 1px solid #dfe1e6;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 6px;
+  box-shadow: 0 16px 34px rgba(9, 30, 66, 0.18);
+}
+
+.mention-menu button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  padding: 7px;
+  color: #172b4d;
+  font: inherit;
+  text-align: left;
   cursor: pointer;
+}
+
+.mention-menu button:hover {
+  background: #f4f0ff;
+}
+
+.mention-menu .member-avatar,
+.comment-composer-header .member-avatar,
+.comment-item .member-avatar {
+  width: 28px;
+  height: 28px;
+  font-size: 11px;
+}
+
+.mention-menu span:last-child {
+  display: grid;
+  gap: 2px;
+}
+
+.mention-menu strong {
+  font-size: 12px;
+}
+
+.mention-menu small {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.comment-attachment-list,
+.comment-item-attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.comment-attachment-chip,
+.comment-item-attachments span {
+  display: inline-flex;
+  min-width: 0;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid #dfe1e6;
+  border-radius: 7px;
+  background: #f8fafc;
+  padding: 6px 7px;
+  color: #344054;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.comment-attachment-chip > span {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.comment-attachment-chip small {
+  color: #667085;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.comment-attachment-chip button {
+  display: grid;
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #667085;
+  cursor: pointer;
+}
+
+.comment-attachment-chip button:hover {
+  color: #b42318;
+  background: #fee4e2;
+}
+
+.comment-composer-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.comment-tool-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comment-composer-actions .small-action-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.comment-composer-actions .modal-update-button {
+  min-height: 30px;
+  padding: 0 12px;
+  font-size: 12px;
+}
+
+.modal-update-button:disabled {
+  background: #c7ced8;
+  cursor: not-allowed;
+}
+
+.comment-feed {
+  display: grid;
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.comment-item {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px;
+}
+
+.comment-item > div {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.comment-item header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.comment-item strong {
+  color: #172b4d;
+  font-size: 12px;
+}
+
+.comment-item header span {
+  color: #667085;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.comment-item p {
+  margin: 0;
+  color: #44546f;
+  font-size: 13px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comment-item-attachments span {
+  background: #ffffff;
+  font-size: 11px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
 }
 
 .card-detail-footer {
@@ -2518,8 +2777,7 @@ select.card-status-select {
   justify-content: flex-end;
   gap: 10px;
   border-top: 1px solid #dfe1e6;
-  margin-top: 16px;
-  padding-top: 12px;
+  padding: 12px 20px;
 }
 
 .project-summary-page {
@@ -2603,6 +2861,43 @@ select.card-status-select {
   .board-column-grid {
     grid-auto-flow: row;
     grid-auto-columns: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .modal-backdrop {
+    padding: 16px;
+  }
+
+  .card-detail-modal {
+    width: calc(100vw - 32px);
+    height: calc(100vh - 32px);
+  }
+
+  .card-detail-header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .card-detail-body {
+    grid-template-columns: 1fr;
+    overflow: auto;
+  }
+
+  .card-detail-main,
+  .card-detail-side {
+    overflow: visible;
+  }
+
+  .card-detail-main {
+    padding-right: 0;
+  }
+
+  .card-detail-side {
+    border-left: 0;
+    padding-left: 0;
+  }
+
+  .linked-work-item-form {
     grid-template-columns: 1fr;
   }
 }

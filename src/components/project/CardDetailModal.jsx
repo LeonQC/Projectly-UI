@@ -52,14 +52,35 @@ function CardDetailModal({
     { id: "label-1", text: "Planning", color: "purple" },
     { id: "label-2", text: "Ready", color: "green" },
   ]);
+  const [commentText, setCommentText] = useState("");
+  const [commentAttachments, setCommentAttachments] = useState([]);
+  const [comments, setComments] = useState([]);
+  const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
   const cardMenuRef = useRef(null);
   const statusMenuRef = useRef(null);
   const memberRemoveRef = useRef(null);
   const labelRemoveRef = useRef(null);
+  const commentInputRef = useRef(null);
+  const commentEditorRef = useRef(null);
+  const attachmentInputRef = useRef(null);
   const filteredMembers = projectMembers.filter((member) => {
     const searchValue = `${member.name} ${member.username}`.toLowerCase();
     return searchValue.includes(memberSearch.toLowerCase());
   });
+  const currentUser = projectMembers[0] ?? {
+    id: "current-user",
+    initials: "ME",
+    name: "You",
+    username: "@you",
+  };
+  const mentionMatch = commentText.match(/(?:^|\s)@([\w-]*)$/);
+  const mentionSearch = mentionMatch?.[1].toLowerCase() ?? "";
+  const mentionOptions = isMentionMenuOpen && mentionMatch
+    ? projectMembers.filter((member) => {
+        const username = member.username.replace(/^@/, "").toLowerCase();
+        return username.includes(mentionSearch) || member.name.toLowerCase().includes(mentionSearch);
+      })
+    : [];
   const availableLinkedWorkItems = linkedWorkItemOptions.filter((workItem) => workItem.id !== card.id);
   const selectedLinkedCard = availableLinkedWorkItems.find((workItem) => workItem.id === linkedCardId);
   const hasDuplicateLinkedWorkItem =
@@ -144,6 +165,83 @@ function CardDetailModal({
     setIsStatusModalOpen(false);
   }
 
+  function addCommentAttachments(event) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    setCommentAttachments((currentAttachments) => [
+      ...currentAttachments,
+      ...selectedFiles.map((file) => ({
+        id: `attachment-${file.name}-${file.lastModified}-${Date.now()}`,
+        name: file.name,
+        size: file.size,
+      })),
+    ]);
+    event.target.value = "";
+  }
+
+  function formatAttachmentSize(size) {
+    if (size < 1024) {
+      return `${size} B`;
+    }
+
+    if (size < 1024 * 1024) {
+      return `${Math.round(size / 1024)} KB`;
+    }
+
+    return `${(size / (1024 * 1024)).toFixed(1)} MB`;
+  }
+
+  function insertMention(member) {
+    const mentionLabel = member.username.startsWith("@") ? member.username : `@${member.username}`;
+    const nextText = mentionMatch
+      ? `${commentText.slice(0, mentionMatch.index)} ${mentionLabel} `
+      : `${commentText}${commentText.endsWith(" ") || commentText.length === 0 ? "" : " "}${mentionLabel} `;
+
+    setCommentText(nextText.replace(/^\s+/, ""));
+    setIsMentionMenuOpen(false);
+    window.requestAnimationFrame(() => commentInputRef.current?.focus());
+  }
+
+  function openMentionMenu() {
+    if (mentionMatch) {
+      setIsMentionMenuOpen(true);
+      window.requestAnimationFrame(() => commentInputRef.current?.focus());
+      return;
+    }
+
+    setCommentText((currentText) => `${currentText}${currentText.endsWith(" ") || currentText.length === 0 ? "" : " "}@`);
+    setIsMentionMenuOpen(true);
+    window.requestAnimationFrame(() => commentInputRef.current?.focus());
+  }
+
+  function publishComment(event) {
+    event.preventDefault();
+
+    const trimmedComment = commentText.trim();
+
+    if (!trimmedComment && commentAttachments.length === 0) {
+      return;
+    }
+
+    setComments((currentComments) => [
+      {
+        id: `comment-${Date.now()}`,
+        author: currentUser,
+        body: trimmedComment,
+        attachments: commentAttachments,
+        createdAt: "Just now",
+      },
+      ...currentComments,
+    ]);
+    setCommentText("");
+    setCommentAttachments([]);
+    setIsMentionMenuOpen(false);
+  }
+
   useEffect(() => {
     function closeDropdownsOnOutsideClick(event) {
       if (cardMenuRef.current && !cardMenuRef.current.contains(event.target)) {
@@ -160,6 +258,10 @@ function CardDetailModal({
 
       if (labelRemoveRef.current && !labelRemoveRef.current.contains(event.target)) {
         setLabelPendingRemoveId(null);
+      }
+
+      if (commentEditorRef.current && !commentEditorRef.current.contains(event.target)) {
+        setIsMentionMenuOpen(false);
       }
     }
 
@@ -470,17 +572,150 @@ function CardDetailModal({
               </header>
               <p>{card.description || "No description yet."}</p>
             </section>
+
+            <section className="card-development-section">
+              <header>
+                <h3>Development</h3>
+              </header>
+              <p className="empty-state">No development activity yet.</p>
+            </section>
           </section>
 
           <aside className="card-detail-side">
-            <details open>
-              <summary>Development</summary>
-              <p className="empty-state">No development activity yet.</p>
-            </details>
-            <details open>
-              <summary>Comments and activity</summary>
-              <p className="empty-state">No comments or activity yet.</p>
-            </details>
+            <section className="comments-activity-panel">
+              <header>
+                <h3>Comments and activity</h3>
+              </header>
+              <form className="comment-composer" onSubmit={publishComment}>
+                <div className="comment-composer-header">
+                  <span className="member-avatar">{currentUser.initials}</span>
+                  <strong>{currentUser.name}</strong>
+                </div>
+                <div className="comment-editor" ref={commentEditorRef}>
+                  <textarea
+                    ref={commentInputRef}
+                    value={commentText}
+                    placeholder="Write a comment. Type @ to mention someone."
+                    rows="4"
+                    onChange={(event) => {
+                      const nextValue = event.target.value;
+
+                      setCommentText(nextValue);
+                      setIsMentionMenuOpen(/(?:^|\s)@[\w-]*$/.test(nextValue));
+                    }}
+                  />
+                  {mentionOptions.length > 0 && (
+                    <div className="mention-menu" role="listbox" aria-label="Mention users">
+                      {mentionOptions.map((member) => (
+                        <button type="button" role="option" onClick={() => insertMention(member)} key={member.id}>
+                          <span className="member-avatar">{member.initials}</span>
+                          <span>
+                            <strong>{member.name}</strong>
+                            <small>{member.username}</small>
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {commentAttachments.length > 0 && (
+                  <div className="comment-attachment-list" aria-label="Selected attachments">
+                    {commentAttachments.map((attachment) => (
+                      <span className="comment-attachment-chip" key={attachment.id}>
+                        <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                          <path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.4-9.4a4 4 0 0 1 5.7 5.7L9.7 17.7a2 2 0 1 1-2.8-2.8l8.8-8.8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                        </svg>
+                        <span>
+                          {attachment.name}
+                          <small>{formatAttachmentSize(attachment.size)}</small>
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Remove ${attachment.name}`}
+                          onClick={() =>
+                            setCommentAttachments((currentAttachments) =>
+                              currentAttachments.filter((item) => item.id !== attachment.id)
+                            )
+                          }
+                        >
+                          <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                            <path d="M6 6l12 12M18 6 6 18" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+                          </svg>
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+
+                <div className="comment-composer-actions">
+                  <div className="comment-tool-actions">
+                    <button
+                      className="small-action-button"
+                      type="button"
+                      onClick={openMentionMenu}
+                    >
+                      @user
+                    </button>
+                    <input
+                      ref={attachmentInputRef}
+                      className="visually-hidden"
+                      type="file"
+                      multiple
+                      onChange={addCommentAttachments}
+                    />
+                    <button
+                      className="small-action-button"
+                      type="button"
+                      onClick={() => attachmentInputRef.current?.click()}
+                    >
+                      <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
+                        <path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.4-9.4a4 4 0 0 1 5.7 5.7L9.7 17.7a2 2 0 1 1-2.8-2.8l8.8-8.8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                      </svg>
+                      Attach
+                    </button>
+                  </div>
+                  <button
+                    className="modal-update-button"
+                    type="submit"
+                    disabled={!commentText.trim() && commentAttachments.length === 0}
+                  >
+                    Comment
+                  </button>
+                </div>
+              </form>
+
+              <div className="comment-feed">
+                {comments.length > 0 ? (
+                  comments.map((comment) => (
+                    <article className="comment-item" key={comment.id}>
+                      <span className="member-avatar">{comment.author.initials}</span>
+                      <div>
+                        <header>
+                          <strong>{comment.author.name}</strong>
+                          <span>{comment.createdAt}</span>
+                        </header>
+                        {comment.body && <p>{comment.body}</p>}
+                        {comment.attachments.length > 0 && (
+                          <div className="comment-item-attachments">
+                            {comment.attachments.map((attachment) => (
+                              <span key={attachment.id}>
+                                <svg aria-hidden="true" fill="none" height="13" viewBox="0 0 24 24" width="13">
+                                  <path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.4-9.4a4 4 0 0 1 5.7 5.7L9.7 17.7a2 2 0 1 1-2.8-2.8l8.8-8.8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                                </svg>
+                                {attachment.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </article>
+                  ))
+                ) : (
+                  <p className="empty-state">No comments or activity yet.</p>
+                )}
+              </div>
+            </section>
           </aside>
         </div>
 

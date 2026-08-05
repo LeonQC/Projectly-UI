@@ -2770,6 +2770,14 @@ select.card-status-select {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.comment-item header > div {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
   gap: 6px;
 }
 
@@ -2791,6 +2799,55 @@ select.card-status-select {
   line-height: 1.45;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.comment-edit-button {
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  padding: 3px 6px;
+  color: #44546f;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.comment-edit-button:hover {
+  background: #f1f5f9;
+  color: #172b4d;
+}
+
+.comment-edit-form {
+  display: grid;
+  gap: 8px;
+}
+
+.comment-edit-form textarea {
+  width: 100%;
+  min-height: 76px;
+  border: 1px solid #d0d5dd;
+  border-radius: 8px;
+  background: #ffffff;
+  padding: 9px;
+  color: #172b4d;
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.45;
+  resize: vertical;
+}
+
+.comment-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.comment-edit-actions .modal-cancel-button,
+.comment-edit-actions .modal-update-button {
+  min-height: 28px;
+  padding: 0 10px;
+  font-size: 12px;
 }
 
 .comment-item-attachments span {

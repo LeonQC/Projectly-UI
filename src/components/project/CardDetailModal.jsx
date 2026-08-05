@@ -56,6 +56,8 @@ function CardDetailModal({
   const [commentText, setCommentText] = useState("");
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [comments, setComments] = useState([]);
+  const [editingCommentId, setEditingCommentId] = useState(null);
+  const [editingCommentText, setEditingCommentText] = useState("");
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
   const cardMenuRef = useRef(null);
   const statusMenuRef = useRef(null);
@@ -239,6 +241,37 @@ function CardDetailModal({
     setCommentText("");
     setCommentAttachments([]);
     setIsMentionMenuOpen(false);
+  }
+
+  function startEditingComment(comment) {
+    setEditingCommentId(comment.id);
+    setEditingCommentText(comment.body);
+  }
+
+  function cancelEditingComment() {
+    setEditingCommentId(null);
+    setEditingCommentText("");
+  }
+
+  function saveEditedComment(comment) {
+    const trimmedComment = editingCommentText.trim();
+
+    if (!trimmedComment && comment.attachments.length === 0) {
+      return;
+    }
+
+    setComments((currentComments) =>
+      currentComments.map((currentComment) =>
+        currentComment.id === comment.id
+          ? {
+              ...currentComment,
+              body: trimmedComment,
+              editedAt: "Edited just now",
+            }
+          : currentComment
+      )
+    );
+    cancelEditingComment();
   }
 
   useEffect(() => {
@@ -691,10 +724,50 @@ function CardDetailModal({
                       <span className="member-avatar">{comment.author.initials}</span>
                       <div>
                         <header>
-                          <strong>{comment.author.name}</strong>
-                          <span>{comment.createdAt}</span>
+                          <div>
+                            <strong>{comment.author.name}</strong>
+                            <span>{comment.createdAt}</span>
+                            {comment.editedAt && <span>{comment.editedAt}</span>}
+                          </div>
+                          {editingCommentId !== comment.id && (
+                            <button
+                              className="comment-edit-button"
+                              type="button"
+                              onClick={() => startEditingComment(comment)}
+                            >
+                              Edit
+                            </button>
+                          )}
                         </header>
-                        {comment.body && <p>{comment.body}</p>}
+                        {editingCommentId === comment.id ? (
+                          <div className="comment-edit-form">
+                            <textarea
+                              value={editingCommentText}
+                              rows="3"
+                              aria-label="Edit comment"
+                              onChange={(event) => setEditingCommentText(event.target.value)}
+                            />
+                            <div className="comment-edit-actions">
+                              <button
+                                className="modal-cancel-button"
+                                type="button"
+                                onClick={cancelEditingComment}
+                              >
+                                Cancel
+                              </button>
+                              <button
+                                className="modal-update-button"
+                                type="button"
+                                disabled={!editingCommentText.trim() && comment.attachments.length === 0}
+                                onClick={() => saveEditedComment(comment)}
+                              >
+                                Save
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          comment.body && <p>{comment.body}</p>
+                        )}
                         {comment.attachments.length > 0 && (
                           <div className="comment-item-attachments">
                             {comment.attachments.map((attachment) => (

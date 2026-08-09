@@ -30,12 +30,14 @@ function CardDetailModal({
   onClose,
   onCreateStatus,
   onStatusChange,
+  onUpdateCard,
   projectMembers = [],
   sprintOptions = [],
   statuses = defaultCardStatuses,
 }) {
   const [activeTab, setActiveTab] = useState("Members");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [titleDraft, setTitleDraft] = useState(card.title ?? "");
   const [sprintId, setSprintId] = useState(card.sprintId ?? "backlog");
   const [linkedRelation, setLinkedRelation] = useState(workItemRelations[0]);
   const [linkedCardId, setLinkedCardId] = useState("");
@@ -274,6 +276,25 @@ function CardDetailModal({
     cancelEditingComment();
   }
 
+  function saveCardDetails() {
+    const trimmedTitle = titleDraft.trim();
+
+    if (!trimmedTitle) {
+      return;
+    }
+
+    onUpdateCard?.(card.id, {
+      title: trimmedTitle,
+      sprintId: sprintId === "backlog" ? null : sprintId,
+    });
+    onClose();
+  }
+
+  useEffect(() => {
+    setTitleDraft(card.title ?? "");
+    setSprintId(card.sprintId ?? "backlog");
+  }, [card.id, card.sprintId, card.title]);
+
   useEffect(() => {
     function closeDropdownsOnOutsideClick(event) {
       if (cardMenuRef.current && !cardMenuRef.current.contains(event.target)) {
@@ -413,7 +434,14 @@ function CardDetailModal({
           <section className="card-detail-main">
             <label className="card-title-row">
               <input type="checkbox" defaultChecked={card.completed} />
-              <h2 id="card-detail-title">{card.title}</h2>
+              <input
+                className="card-title-input"
+                id="card-detail-title"
+                type="text"
+                value={titleDraft}
+                aria-label="Card title"
+                onChange={(event) => setTitleDraft(event.target.value)}
+              />
             </label>
 
             <nav className="card-detail-tabs" aria-label="Card detail tabs">
@@ -616,7 +644,7 @@ function CardDetailModal({
           <aside className="card-detail-side">
             <section className="comments-activity-panel">
               <header>
-                <h3>Comments and activity</h3>
+                <h3>Comments</h3>
               </header>
               <form className="comment-composer" onSubmit={publishComment}>
                 <div className="comment-composer-header">
@@ -784,7 +812,7 @@ function CardDetailModal({
                     </article>
                   ))
                 ) : (
-                  <p className="empty-state">No comments or activity yet.</p>
+                  <p className="empty-state">No comments yet.</p>
                 )}
               </div>
             </section>
@@ -795,7 +823,12 @@ function CardDetailModal({
           <button className="modal-cancel-button" type="button" onClick={onClose}>
             Cancel
           </button>
-          <button className="modal-update-button" type="button" onClick={onClose}>
+          <button
+            className="modal-update-button"
+            type="button"
+            disabled={!titleDraft.trim()}
+            onClick={saveCardDetails}
+          >
             Save
           </button>
         </footer>

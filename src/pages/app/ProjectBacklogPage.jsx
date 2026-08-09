@@ -394,6 +394,25 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     );
   }
 
+  function updateCardDetails(cardId, updates) {
+    setCreatedCards((cards) =>
+      cards.map((card) => (card.id === cardId ? { ...card, ...updates } : card))
+    );
+    setLocalEpics((currentEpics) =>
+      currentEpics.map((epic) => ({
+        ...epic,
+        cards: epic.cards.map((card) => (card.id === cardId ? { ...card, ...updates } : card)),
+        sprints: (epic.sprints ?? []).map((epicSprint) => ({
+          ...epicSprint,
+          cards: epicSprint.cards.map((card) =>
+            card.id === cardId ? { ...card, ...updates } : card
+          ),
+        })),
+      }))
+    );
+    setSelectedCard((card) => (card?.id === cardId ? { ...card, ...updates } : card));
+  }
+
   function createCustomStatus(title) {
     const statusLabel = title.trim();
 
@@ -841,6 +860,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           onClose={() => setSelectedCard(null)}
           onCreateStatus={createCustomStatus}
           onStatusChange={updateCardStatus}
+          onUpdateCard={updateCardDetails}
           projectMembers={projectMembers}
           sprintOptions={sprintOptions}
           statuses={statusOptions}

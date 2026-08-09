@@ -982,7 +982,7 @@
 :root[data-theme="dark"] .epic-header h2,
 :root[data-theme="dark"] .status-group-header h2,
 :root[data-theme="dark"] .board-column-header h3,
-:root[data-theme="dark"] .card-title-row h2,
+:root[data-theme="dark"] .card-title-input,
 :root[data-theme="dark"] .linked-work-items-section h3,
 :root[data-theme="dark"] .card-description-section h3,
 :root[data-theme="dark"] .card-development-section h3,
@@ -2246,11 +2246,26 @@ select.card-status-select {
   accent-color: #7c3aed;
 }
 
-.card-title-row h2 {
+.card-title-input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  padding: 3px 6px;
   margin: 0;
   color: #172b4d;
+  font: inherit;
   font-size: 22px;
+  font-weight: 800;
   line-height: 1.25;
+}
+
+.card-title-input:hover,
+.card-title-input:focus {
+  border-color: #d0d5dd;
+  background: #ffffff;
+  outline: none;
 }
 
 .card-detail-tabs {

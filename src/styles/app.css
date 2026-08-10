@@ -270,6 +270,19 @@
   background: #e6e7e9;
 }
 
+.archived-workspace-item {
+  color: #7a869a;
+}
+
+.archived-workspace-item .workspace-icon {
+  color: #7a869a;
+  background: #edf0f4;
+}
+
+.archived-workspace-item.is-active {
+  background: #f1f3f6;
+}
+
 .workspace-icon {
   width: 26px;
   height: 26px;
@@ -1063,6 +1076,19 @@
   background: #243044;
 }
 
+:root[data-theme="dark"] .archived-workspace-item {
+  color: #94a3b8;
+}
+
+:root[data-theme="dark"] .archived-workspace-item .workspace-icon {
+  color: #cbd5e1;
+  background: #263244;
+}
+
+:root[data-theme="dark"] .archived-workspace-item.is-active {
+  background: #1f2937;
+}
+
 :root[data-theme="dark"] .icon-button,
 :root[data-theme="dark"] .sidebar-toggle-button,
 :root[data-theme="dark"] .section-toggle-button,
@@ -1259,18 +1285,31 @@
   box-shadow: 0 10px 24px rgba(9, 30, 66, 0.14);
 }
 
-.project-dropdown-menu span {
+.project-dropdown-menu span,
+.project-dropdown-menu button {
+  width: 100%;
   border-radius: 6px;
+  border: 0;
   padding: 8px 10px;
   color: #172b4d;
   background: transparent;
   font-size: 12px;
   font-weight: 800;
   cursor: pointer;
+  text-align: left;
 }
 
-.project-dropdown-menu span:hover {
+.project-dropdown-menu span:hover,
+.project-dropdown-menu button:hover {
   background: #f1f3f6;
+}
+
+.project-dropdown-menu button.danger {
+  color: #c9372c;
+}
+
+.project-dropdown-menu button.danger:hover {
+  background: #ffebe6;
 }
 
 .archived-project-tile {
@@ -1279,6 +1318,25 @@
   justify-content: space-between;
   gap: 12px;
   color: #626f86;
+}
+
+.archived-project-tile > span:first-child {
+  display: grid;
+  gap: 3px;
+}
+
+.archived-project-tile strong {
+  color: #172b4d;
+}
+
+.archived-project-tile small {
+  font-size: 12px;
+}
+
+.archived-project-menu-button {
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .archived-work-page {
@@ -1317,20 +1375,23 @@
   padding: 10px;
 }
 
-.restore-action-button {
-  min-height: 32px;
+.archived-work-item-menu {
+  flex: 0 0 auto;
+}
+
+.archived-work-menu-button {
+  width: 30px;
+  height: 30px;
   border: 0;
   border-radius: 7px;
-  padding: 0 12px;
-  color: #ffffff;
-  background: #7c3aed;
-  font-size: 12px;
+  background: transparent;
+  font-size: 16px;
   font-weight: 800;
   cursor: pointer;
 }
 
-.restore-action-button:hover {
-  background: #6d28d9;
+.archived-work-menu-button:hover {
+  background: #e9edf3;
 }
 
 .archived-work-type {

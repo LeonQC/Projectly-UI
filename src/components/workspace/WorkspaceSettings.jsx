@@ -24,10 +24,10 @@ function WorkspaceSettings({ workspace }) {
       </section>
 
       <section className="settings-panel">
-        <h2>Delete workspace</h2>
-        <p>Delete this workspace and its projects. This is a destructive action.</p>
+        <h2>Archive workspace</h2>
+        <p>Archive this workspace and hide it from the active workspace list.</p>
         <button className="settings-delete-button" type="button">
-          Delete workspace
+          Archive workspace
         </button>
       </section>
     </div>

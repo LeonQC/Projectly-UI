@@ -63,6 +63,7 @@ function WorkspaceNavGroup({ activePage, onOpenWorkspaceProjects, title, workspa
 function Sidebar({
   activePage,
   guestWorkspaces = [],
+  onOpenArchivedProjects,
   onOpenAllProjects,
   onOpenInbox,
   onOpenProject,
@@ -271,6 +272,14 @@ function Sidebar({
         title="YOUR WORKSPACES"
         workspaces={workspaces}
       >
+        <button
+          className={`workspace-item archived-workspace-item ${activePage.name === "archived-workspace" ? "is-active" : ""}`}
+          type="button"
+          onClick={onOpenArchivedProjects}
+        >
+          <span className="workspace-icon">D</span>
+          <span>Archived Workspace</span>
+        </button>
         <button className="create-workspace-button" type="button" onClick={() => setIsCreatingWorkspace(true)}>
           + Create new workspace
         </button>

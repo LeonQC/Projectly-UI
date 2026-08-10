@@ -1,7 +1,15 @@
 import React from "react";
 import AuthLayout from "../../components/auth/AuthLayout.jsx";
 
-function RegisterPage({ onNavigate }) {
+function RegisterPage({
+  error,
+  googleClientId,
+  isSubmitting,
+  onGoogleError,
+  onGoogleSubmit,
+  onNavigate,
+  onRegister,
+}) {
   return (
     <AuthLayout
       onNavigate={onNavigate}
@@ -12,21 +20,31 @@ function RegisterPage({ onNavigate }) {
         subtitle:
           "Create a workspace account to start organizing projects and cards.",
         googleLabel: "Register with Google",
+        googleClientId,
         submitLabel: "Register",
+        error,
+        isSubmitting,
+        onGoogleError,
+        onGoogleSubmit,
+        onSubmit: onRegister,
         fields: [
           {
             label: "Username",
+            name: "username",
           },
           {
             label: "Email",
+            name: "email",
             type: "email",
           },
           {
             label: "Password",
+            name: "password",
             type: "password",
           },
           {
             label: "Confirm password",
+            name: "confirm_password",
             type: "password",
           },
         ],

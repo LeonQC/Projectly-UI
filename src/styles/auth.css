@@ -70,6 +70,12 @@
   cursor: pointer;
 }
 
+.google-button:disabled,
+.primary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
 .google-button {
   display: inline-flex;
   align-items: center;
@@ -78,6 +84,27 @@
   border: 1px solid #cbd5e1;
   color: #111827;
   background: #ffffff;
+}
+
+.google-button-host {
+  display: flex;
+  width: 100%;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+}
+
+.google-button-host > div {
+  width: 100%;
+}
+
+.google-button-host iframe {
+  width: 100% !important;
+}
+
+.google-button-host.is-disabled {
+  pointer-events: none;
+  opacity: 0.65;
 }
 
 .google-mark {
@@ -114,6 +141,16 @@
 .auth-form {
   display: grid;
   gap: 11px;
+}
+
+.auth-error {
+  margin: 0;
+  border-radius: 8px;
+  padding: 10px 12px;
+  color: #991b1b;
+  background: #fee2e2;
+  font-size: 13px;
+  font-weight: 800;
 }
 
 .field {

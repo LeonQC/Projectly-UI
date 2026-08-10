@@ -70,6 +70,7 @@ function Sidebar({
   onOpenUserSettings,
   onOpenWorkspaceProjects,
   onCreateWorkspace,
+  onLogout,
   user,
   workspaces,
 }) {
@@ -241,7 +242,14 @@ function Sidebar({
             >
               Settings
             </button>
-            <button type="button" role="menuitem">
+            <button
+              type="button"
+              role="menuitem"
+              onClick={() => {
+                onLogout();
+                setIsUserMenuOpen(false);
+              }}
+            >
               Log out
             </button>
           </div>

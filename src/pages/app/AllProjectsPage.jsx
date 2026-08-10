@@ -72,6 +72,7 @@ function CreateProjectTile({ onClick }) {
 }
 
 function WorkspaceProjects({
+  archivedProjectIds = [],
   workspace,
   canCreateProject = false,
   onOpenProject,
@@ -109,7 +110,7 @@ function WorkspaceProjects({
         )}
       </header>
       <div className="board-grid">
-        {workspace.projects.map((project) => (
+        {workspace.projects.filter((project) => !archivedProjectIds.includes(project.id)).map((project) => (
           <ProjectTile onOpenProject={onOpenProject} project={project} key={project.id} />
         ))}
         {canCreateProject && (
@@ -124,7 +125,7 @@ function WorkspaceProjects({
   );
 }
 
-function AllProjectsPage({ workspaces, guestWorkspaces, onOpenProject, onOpenWorkspaceProjects }) {
+function AllProjectsPage({ archivedProjectIds = [], workspaces, guestWorkspaces, onOpenProject, onOpenWorkspaceProjects }) {
   return (
     <section className="app-content" aria-labelledby="all-projects-title">
       <header className="page-header">
@@ -138,6 +139,7 @@ function AllProjectsPage({ workspaces, guestWorkspaces, onOpenProject, onOpenWor
           <h2 className="boards-section-title">YOUR WORKSPACES</h2>
           {workspaces.map((workspace) => (
             <WorkspaceProjects
+              archivedProjectIds={archivedProjectIds}
               canCreateProject
               onOpenProject={onOpenProject}
               onOpenWorkspaceProjects={onOpenWorkspaceProjects}
@@ -151,6 +153,7 @@ function AllProjectsPage({ workspaces, guestWorkspaces, onOpenProject, onOpenWor
           <h2 className="boards-section-title">GUEST WORKSPACES</h2>
           {guestWorkspaces.map((workspace) => (
             <WorkspaceProjects
+              archivedProjectIds={archivedProjectIds}
               onOpenProject={onOpenProject}
               showActions={false}
               workspace={workspace}

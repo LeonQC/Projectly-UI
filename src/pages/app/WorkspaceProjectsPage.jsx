@@ -13,6 +13,7 @@ function WorkspaceProjectsPage({
   onArchiveProject,
   onCreateProject,
   onOpenProject,
+  onPermanentlyDeleteProject,
   onRestoreProject,
   shouldOpenCreateProject = false,
   workspace,
@@ -57,9 +58,13 @@ function WorkspaceProjectsPage({
         />
       ) : activeWorkspaceTab === "settings" ? (
         <WorkspaceSettings workspace={workspace} />
-      ) : (
-        <ArchivedProjects onRestoreProject={onRestoreProject} projects={archivedProjects} />
-      )}
+      ) : activeWorkspaceTab === "archived-projects" ? (
+        <ArchivedProjects
+          onPermanentlyDeleteProject={onPermanentlyDeleteProject}
+          onRestoreProject={onRestoreProject}
+          projects={archivedProjects}
+        />
+      ) : null}
 
       {isCreatingProject && (
         <CreateProjectModal

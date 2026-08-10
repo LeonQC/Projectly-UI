@@ -289,6 +289,26 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     );
   }
 
+  function permanentlyDeleteEpic(epicId) {
+    setLocalEpics((currentEpics) => currentEpics.filter((epic) => epic.id !== epicId));
+    setExpandedEpicId((currentEpicId) => (currentEpicId === epicId ? null : currentEpicId));
+    setActiveSprintEpicId((currentEpicId) => (currentEpicId === epicId ? null : currentEpicId));
+  }
+
+  function permanentlyDeleteSprint(sprintId) {
+    setLocalEpics((currentEpics) =>
+      currentEpics.map((epic) => ({
+        ...epic,
+        sprints: (epic.sprints ?? []).filter((epicSprint) => epicSprint.id !== sprintId),
+      }))
+    );
+  }
+
+  function permanentlyDeleteCard(cardId) {
+    removeCardFromProject(cardId);
+    setSelectedCard((card) => (card?.id === cardId ? null : card));
+  }
+
   function moveSprint(epicId, action) {
     setLocalEpics((currentEpics) =>
       currentEpics.map((epic) => {
@@ -577,6 +597,9 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           archivedCards={archivedCards}
           archivedEpics={archivedEpics}
           archivedSprints={archivedSprints}
+          onPermanentlyDeleteCard={permanentlyDeleteCard}
+          onPermanentlyDeleteEpic={permanentlyDeleteEpic}
+          onPermanentlyDeleteSprint={permanentlyDeleteSprint}
           onRestoreCard={restoreCard}
           onRestoreEpic={restoreEpic}
           onRestoreSprint={restoreSprint}

@@ -4,6 +4,7 @@ import AllProjectsPage from "../../pages/app/AllProjectsPage.jsx";
 import InboxPage from "../../pages/app/InboxPage.jsx";
 import ProjectBacklogPage from "../../pages/app/ProjectBacklogPage.jsx";
 import UserSettingsPage from "../../pages/app/UserSettingsPage.jsx";
+import ArchivedProjects from "../workspace/ArchivedProjects.jsx";
 import WorkspaceProjectsPage from "../../pages/app/WorkspaceProjectsPage.jsx";
 import Sidebar from "./Sidebar.jsx";
 
@@ -21,6 +22,15 @@ function AppShell() {
     workspaces.find((workspace) =>
       workspace.projects.some((project) => project.id === activeProject.id)
     ) ?? workspaces[0];
+  const archivedProjects = workspaces.flatMap((workspace) =>
+    workspace.projects
+      .filter((project) => archivedProjectIds.includes(project.id))
+      .map((project) => ({
+        ...project,
+        workspaceName: workspace.name,
+      }))
+  );
+
   function archiveProject(projectId) {
     setArchivedProjectIds((projectIds) =>
       projectIds.includes(projectId) ? projectIds : [...projectIds, projectId]
@@ -43,8 +53,26 @@ function AppShell() {
     setArchivedProjectIds((projectIds) => projectIds.filter((archivedProjectId) => archivedProjectId !== projectId));
   }
 
+  function permanentlyDeleteProject(projectId) {
+    setArchivedProjectIds((projectIds) => projectIds.filter((archivedProjectId) => archivedProjectId !== projectId));
+    setWorkspaces((currentWorkspaces) =>
+      currentWorkspaces.map((workspace) => ({
+        ...workspace,
+        projects: workspace.projects.filter((project) => project.id !== projectId),
+      }))
+    );
+
+    if (activePage.projectId === projectId) {
+      setActivePage({ name: "archived-workspace" });
+    }
+  }
+
   function openAllProjects() {
     setActivePage({ name: "all-projects" });
+  }
+
+  function openArchivedProjects() {
+    setActivePage({ name: "archived-workspace" });
   }
 
   function openInbox() {
@@ -141,6 +169,7 @@ function AppShell() {
       {isSidebarVisible && (
         <Sidebar
           activePage={activePage}
+          onOpenArchivedProjects={openArchivedProjects}
           onOpenAllProjects={openAllProjects}
           onOpenInbox={openInbox}
           onOpenProject={openProject}
@@ -183,6 +212,19 @@ function AppShell() {
         <InboxPage inboxItems={inboxItems} />
       ) : activePage.name === "user-settings" ? (
         <UserSettingsPage user={user} />
+      ) : activePage.name === "archived-workspace" ? (
+        <section className="app-content" aria-labelledby="archived-workspace-title">
+          <header className="page-header">
+            <div>
+              <h1 id="archived-workspace-title">Archived Workspace</h1>
+            </div>
+          </header>
+          <ArchivedProjects
+            onPermanentlyDeleteProject={permanentlyDeleteProject}
+            onRestoreProject={restoreProject}
+            projects={archivedProjects}
+          />
+        </section>
       ) : activePage.name === "project-backlog" ? (
         <ProjectBacklogPage
           onArchiveProject={archiveProject}
@@ -199,12 +241,14 @@ function AppShell() {
           shouldOpenCreateProject={activePage.openCreateProject}
           onArchiveProject={archiveProject}
           onOpenProject={openProject}
+          onPermanentlyDeleteProject={permanentlyDeleteProject}
           onRestoreProject={restoreProject}
           workspace={activeWorkspace}
         />
       ) : (
         <AllProjectsPage
           guestWorkspaces={guestWorkspaces}
+          archivedProjectIds={archivedProjectIds}
           onOpenProject={openProject}
           onOpenWorkspaceProjects={openWorkspaceProjects}
           workspaces={workspaces}

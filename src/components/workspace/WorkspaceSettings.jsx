@@ -1,7 +1,20 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
-function WorkspaceSettings({ workspace }) {
+function WorkspaceSettings({ onArchiveWorkspace, onRenameWorkspace, workspace }) {
   const [workspaceName, setWorkspaceName] = useState(workspace.name);
+
+  useEffect(() => {
+    setWorkspaceName(workspace.name);
+  }, [workspace.name]);
+
+  function saveWorkspaceName() {
+    const normalizedName = workspaceName.trim();
+    if (!normalizedName || normalizedName === workspace.name) {
+      return;
+    }
+
+    onRenameWorkspace(workspace.id, { name: normalizedName });
+  }
 
   return (
     <div className="workspace-settings-page">
@@ -17,7 +30,7 @@ function WorkspaceSettings({ workspace }) {
           />
         </label>
         <div className="settings-actions">
-          <button className="settings-save-button" type="button">
+          <button className="settings-save-button" type="button" onClick={saveWorkspaceName}>
             Save changes
           </button>
         </div>
@@ -26,7 +39,11 @@ function WorkspaceSettings({ workspace }) {
       <section className="settings-panel">
         <h2>Archive workspace</h2>
         <p>Archive this workspace and hide it from the active workspace list.</p>
-        <button className="settings-delete-button" type="button">
+        <button
+          className="settings-delete-button"
+          type="button"
+          onClick={() => onArchiveWorkspace(workspace.id)}
+        >
           Archive workspace
         </button>
       </section>

@@ -1826,6 +1826,18 @@
   font-size: 13px;
 }
 
+.app-error {
+  max-width: 760px;
+  margin: 0 0 16px;
+  padding: 10px 12px;
+  border: 1px solid #fca5a5;
+  border-radius: 8px;
+  color: #991b1b;
+  background: #fef2f2;
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .sprint-date-grid {
   display: grid;
   gap: 8px;

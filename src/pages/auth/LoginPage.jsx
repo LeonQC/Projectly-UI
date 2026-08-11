@@ -1,7 +1,15 @@
 import React from "react";
 import AuthLayout from "../../components/auth/AuthLayout.jsx";
 
-function LoginPage({ onNavigate }) {
+function LoginPage({
+  error,
+  googleClientId,
+  isSubmitting,
+  onGoogleError,
+  onGoogleSubmit,
+  onLogin,
+  onNavigate,
+}) {
   return (
     <AuthLayout
       onNavigate={onNavigate}
@@ -11,15 +19,22 @@ function LoginPage({ onNavigate }) {
         title: "Log in to your account",
         subtitle: "Access your workspaces, projects, cards, and team activity.",
         googleLabel: "Continue with Google",
+        googleClientId,
         submitLabel: "Log in",
-        submitTarget: "app",
+        error,
+        isSubmitting,
+        onGoogleError,
+        onGoogleSubmit,
+        onSubmit: onLogin,
         fields: [
           {
             label: "Email",
+            name: "email",
             type: "email",
           },
           {
             label: "Password",
+            name: "password",
             type: "password",
           },
         ],

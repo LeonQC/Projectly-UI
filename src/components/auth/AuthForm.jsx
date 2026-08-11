@@ -1,11 +1,21 @@
-import React from "react";
+import React, { useState } from "react";
 import GoogleAuthButton from "./GoogleAuthButton.jsx";
 
-function TextField({ label, type = "text", defaultValue }) {
+function getFieldName(label) {
+  return label.toLowerCase().replace(/\s+/g, "_");
+}
+
+function TextField({ label, name, type = "text", value, onChange }) {
   return (
     <label className="field">
       <span>{label}</span>
-      <input type={type} defaultValue={defaultValue} />
+      <input
+        name={name}
+        type={type}
+        value={value}
+        autoComplete={type === "password" ? "current-password" : "on"}
+        onChange={onChange}
+      />
     </label>
   );
 }
@@ -14,15 +24,37 @@ function AuthForm({
   title,
   subtitle,
   googleLabel,
+  googleClientId,
   submitLabel,
   fields,
   footerText,
   footerAction,
   footerTarget,
-  submitTarget,
+  isSubmitting = false,
+  error,
+  onGoogleError,
+  onGoogleSubmit,
   onNavigate,
+  onSubmit,
   showForgotPassword = false,
 }) {
+  const [values, setValues] = useState(() =>
+    fields.reduce((formValues, field) => {
+      formValues[field.name ?? getFieldName(field.label)] = field.defaultValue ?? "";
+      return formValues;
+    }, {})
+  );
+
+  function updateField(event) {
+    const { name, value } = event.target;
+    setValues((currentValues) => ({ ...currentValues, [name]: value }));
+  }
+
+  function submitForm(event) {
+    event.preventDefault();
+    onSubmit?.(values);
+  }
+
   return (
     <section className="auth-panel" aria-labelledby="auth-title">
       <div className="brand-lockup">
@@ -37,22 +69,32 @@ function AuthForm({
 
       {googleLabel && (
         <>
-          <GoogleAuthButton label={googleLabel} />
+          <GoogleAuthButton
+            clientId={googleClientId}
+            disabled={isSubmitting}
+            label={googleLabel}
+            onCredential={onGoogleSubmit}
+            onError={onGoogleError}
+          />
           <div className="divider">
             <span>OR</span>
           </div>
         </>
       )}
 
-      <form className="auth-form">
+      <form className="auth-form" onSubmit={submitForm}>
         {fields.map((field) => (
           <TextField
             key={field.label}
             label={field.label}
+            name={field.name ?? getFieldName(field.label)}
             type={field.type}
-            defaultValue={field.defaultValue}
+            value={values[field.name ?? getFieldName(field.label)] ?? ""}
+            onChange={updateField}
           />
         ))}
+
+        {error && <p className="auth-error">{error}</p>}
 
         {showForgotPassword && (
           <button
@@ -66,10 +108,10 @@ function AuthForm({
 
         <button
           className="primary-button"
-          type="button"
-          onClick={() => submitTarget && onNavigate(submitTarget)}
+          type="submit"
+          disabled={isSubmitting}
         >
-          {submitLabel}
+          {isSubmitting ? "Please wait..." : submitLabel}
         </button>
       </form>
 

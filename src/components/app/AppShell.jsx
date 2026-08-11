@@ -8,7 +8,27 @@ import ArchivedProjects from "../workspace/ArchivedProjects.jsx";
 import WorkspaceProjectsPage from "../../pages/app/WorkspaceProjectsPage.jsx";
 import Sidebar from "./Sidebar.jsx";
 
-function AppShell() {
+function getInitials(name) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function AppShell({ currentUser, onLogout }) {
+  const sidebarUser = currentUser
+    ? {
+        ...user,
+        id: currentUser.id,
+        name: currentUser.username,
+        email: currentUser.email,
+        avatarUrl: currentUser.avatar_url,
+        initials: getInitials(currentUser.username || currentUser.email),
+      }
+    : user;
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [activePage, setActivePage] = useState({ name: "all-projects" });
   const [archivedProjectIds, setArchivedProjectIds] = useState([]);
@@ -176,7 +196,8 @@ function AppShell() {
           onOpenUserSettings={openUserSettings}
           onOpenWorkspaceProjects={openWorkspaceProjects}
           onCreateWorkspace={createWorkspace}
-          user={user}
+          onLogout={onLogout}
+          user={sidebarUser}
           guestWorkspaces={guestWorkspaces}
           workspaces={workspaces}
         />
@@ -211,7 +232,7 @@ function AppShell() {
       {activePage.name === "inbox" ? (
         <InboxPage inboxItems={inboxItems} />
       ) : activePage.name === "user-settings" ? (
-        <UserSettingsPage user={user} />
+        <UserSettingsPage user={sidebarUser} />
       ) : activePage.name === "archived-workspace" ? (
         <section className="app-content" aria-labelledby="archived-workspace-title">
           <header className="page-header">

@@ -70,3 +70,49 @@ export async function getCurrentUser() {
   const payload = await apiFetch("/auth/me");
   return payload.data;
 }
+
+export async function listWorkspaces() {
+  const payload = await apiFetch("/workspaces");
+  return payload.data;
+}
+
+export async function listArchivedWorkspaces() {
+  const payload = await apiFetch("/workspaces/deleted");
+  return payload.data;
+}
+
+export async function createWorkspace({ name }) {
+  const payload = await apiFetch("/workspaces", {
+    method: "POST",
+    body: JSON.stringify({ name }),
+  });
+  return payload.data;
+}
+
+export async function updateWorkspace(workspaceId, updates) {
+  const payload = await apiFetch(`/workspaces/${workspaceId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+  return payload.data;
+}
+
+export async function archiveWorkspace(workspaceId) {
+  const payload = await apiFetch(`/workspaces/${workspaceId}`, {
+    method: "DELETE",
+  });
+  return payload;
+}
+
+export async function restoreWorkspace(workspaceId) {
+  const payload = await apiFetch(`/workspaces/${workspaceId}/restore`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function permanentlyDeleteWorkspace(workspaceId) {
+  return apiFetch(`/workspaces/${workspaceId}/permanent`, {
+    method: "DELETE",
+  });
+}

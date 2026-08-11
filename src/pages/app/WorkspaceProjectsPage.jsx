@@ -11,9 +11,11 @@ function WorkspaceProjectsPage({
   createProjectRequestId,
   initialTab = "projects",
   onArchiveProject,
+  onArchiveWorkspace,
   onCreateProject,
   onOpenProject,
   onPermanentlyDeleteProject,
+  onRenameWorkspace,
   onRestoreProject,
   shouldOpenCreateProject = false,
   workspace,
@@ -57,7 +59,11 @@ function WorkspaceProjectsPage({
           projects={activeProjects}
         />
       ) : activeWorkspaceTab === "settings" ? (
-        <WorkspaceSettings workspace={workspace} />
+        <WorkspaceSettings
+          onArchiveWorkspace={onArchiveWorkspace}
+          onRenameWorkspace={onRenameWorkspace}
+          workspace={workspace}
+        />
       ) : activeWorkspaceTab === "archived-projects" ? (
         <ArchivedProjects
           onPermanentlyDeleteProject={onPermanentlyDeleteProject}

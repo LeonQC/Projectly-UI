@@ -13,10 +13,16 @@ import ProjectTabs from "../../components/project/ProjectTabs.jsx";
 import SprintEditModal from "../../components/project/SprintEditModal.jsx";
 import {
   archiveEpic as archiveEpicRequest,
+  archiveSprint as archiveSprintRequest,
   createEpic as createEpicRequest,
+  createSprint as createSprintRequest,
+  listEpicSprints,
   listProjectEpics,
   permanentlyDeleteEpic as permanentlyDeleteEpicRequest,
+  permanentlyDeleteSprint as permanentlyDeleteSprintRequest,
   restoreEpic as restoreEpicRequest,
+  restoreSprint as restoreSprintRequest,
+  updateSprint as updateSprintRequest,
   updateEpic as updateEpicRequest,
 } from "../../lib/api.js";
 
@@ -40,7 +46,25 @@ function mapEpic(epic) {
     title: epic.title ?? epic.name,
     deadline: epic.deadline ?? "",
     cards: epic.cards ?? [],
-    sprints: epic.sprints ?? [],
+    sprints: (epic.sprints ?? []).map(mapSprint),
+  };
+}
+
+function mapSprint(sprint) {
+  return {
+    ...sprint,
+    id: sprint.id,
+    epicId: sprint.epic_id ?? sprint.epicId,
+    epic_id: sprint.epic_id ?? sprint.epicId,
+    title: sprint.name ?? sprint.title,
+    name: sprint.name ?? sprint.title,
+    goal: sprint.goal ?? "",
+    startDate: sprint.start_date ?? sprint.startDate ?? "",
+    start_date: sprint.start_date ?? sprint.startDate ?? "",
+    endDate: sprint.end_date ?? sprint.endDate ?? "",
+    end_date: sprint.end_date ?? sprint.endDate ?? "",
+    isStarted: (sprint.status ?? "planned") === "active",
+    cards: sprint.cards ?? [],
   };
 }
 
@@ -58,7 +82,6 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   const [epicMenuId, setEpicMenuId] = useState(null);
   const [activeSprintEpicId, setActiveSprintEpicId] = useState(null);
   const [sprintName, setSprintName] = useState("");
-  const [sprintDuration, setSprintDuration] = useState("custom");
   const [sprintStartDate, setSprintStartDate] = useState("");
   const [sprintEndDate, setSprintEndDate] = useState("");
   const [sprintStartTime, setSprintStartTime] = useState("00:00");
@@ -185,8 +208,14 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       setLocalEpics([]);
       try {
         const epicData = await listProjectEpics(project.id);
+        const epicsWithSprints = await Promise.all(
+          epicData.map(async (epic) => ({
+            ...mapEpic(epic),
+            sprints: (await listEpicSprints(epic.id)).map(mapSprint),
+          }))
+        );
         if (isMounted) {
-          setLocalEpics(epicData.map(mapEpic));
+          setLocalEpics(epicsWithSprints);
         }
       } catch (error) {
         if (isMounted) {
@@ -276,25 +305,34 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     setEpicMenuId(null);
   }
 
-  function archiveSprint(epicId) {
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => {
-        if (epic.id !== epicId) {
-          return epic;
-        }
+  async function archiveSprint(epicId) {
+    const epic = localEpics.find((currentEpic) => currentEpic.id === epicId);
+    const activeSprint = epic?.sprints?.find((epicSprint) => !epicSprint.archived);
 
-        const activeSprint = epic.sprints?.find((epicSprint) => !epicSprint.archived);
+    if (!activeSprint) {
+      return;
+    }
 
-        return {
-          ...epic,
-          sprints: (epic.sprints ?? []).map((epicSprint) =>
-            epicSprint.id === activeSprint?.id ? { ...epicSprint, archived: true } : epicSprint
-          ),
-        };
-      })
-    );
-    setSprintMenuEpicId(null);
-    setExpandedEpicId((currentEpicId) => (currentEpicId === epicId ? null : currentEpicId));
+    setEpicError("");
+    try {
+      await archiveSprintRequest(activeSprint.id);
+      setLocalEpics((currentEpics) =>
+        currentEpics.map((currentEpic) =>
+          currentEpic.id === epicId
+            ? {
+                ...currentEpic,
+                sprints: (currentEpic.sprints ?? []).map((epicSprint) =>
+                  epicSprint.id === activeSprint.id ? { ...epicSprint, archived: true } : epicSprint
+                ),
+              }
+            : currentEpic
+        )
+      );
+      setSprintMenuEpicId(null);
+      setExpandedEpicId((currentEpicId) => (currentEpicId === epicId ? null : currentEpicId));
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   function archiveCard(cardId) {
@@ -335,15 +373,27 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     }
   }
 
-  function restoreSprint(sprintId) {
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => ({
-        ...epic,
-        sprints: (epic.sprints ?? []).map((epicSprint) =>
-          epicSprint.id === sprintId ? { ...epicSprint, archived: false } : epicSprint
-        ),
-      }))
-    );
+  async function restoreSprint(sprintId) {
+    setEpicError("");
+    try {
+      const sprint = mapSprint(await restoreSprintRequest(sprintId));
+      setLocalEpics((currentEpics) =>
+        currentEpics.map((epic) => ({
+          ...epic,
+          sprints: (epic.sprints ?? []).map((epicSprint) =>
+            epicSprint.id === sprintId
+              ? {
+                  ...epicSprint,
+                  ...sprint,
+                  cards: epicSprint.cards,
+                }
+              : epicSprint
+          ),
+        }))
+      );
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   function restoreCard(cardId) {
@@ -376,13 +426,19 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     }
   }
 
-  function permanentlyDeleteSprint(sprintId) {
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => ({
-        ...epic,
-        sprints: (epic.sprints ?? []).filter((epicSprint) => epicSprint.id !== sprintId),
-      }))
-    );
+  async function permanentlyDeleteSprint(sprintId) {
+    setEpicError("");
+    try {
+      await permanentlyDeleteSprintRequest(sprintId);
+      setLocalEpics((currentEpics) =>
+        currentEpics.map((epic) => ({
+          ...epic,
+          sprints: (epic.sprints ?? []).filter((epicSprint) => epicSprint.id !== sprintId),
+        }))
+      );
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   function permanentlyDeleteCard(cardId) {
@@ -735,6 +791,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
               setSprintName(selectedSprint.title);
               setSprintStartDate(selectedSprint.startDate);
               setSprintEndDate(selectedSprint.endDate);
+              setSprintGoal(selectedSprint.goal ?? "");
               setIsEditingSprint(true);
               setSprintMenuEpicId(null);
             }}
@@ -754,7 +811,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
               setActiveSprintEpicId(epicId);
               setExpandedEpicId(epicId);
             }}
-            onStartSprint={(epicId) => {
+            onStartSprint={async (epicId) => {
               const selectedEpic = epics.find((epic) => epic.id === epicId);
               const selectedSprint = selectedEpic?.sprints?.find((epicSprint) => !epicSprint.archived);
               const selectedSprintCards = selectedSprint?.cards ?? [];
@@ -769,19 +826,27 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
                 return;
               }
 
-              setLocalEpics((currentEpics) =>
-                currentEpics.map((epic) =>
-                  epic.id === epicId
-                    ? {
-                        ...epic,
-                        sprints: epic.sprints.map((epicSprint) =>
-                          epicSprint.id === selectedSprint.id ? { ...epicSprint, isStarted: true } : epicSprint
-                        ),
-                      }
-                    : epic
-                )
-              );
-              setActiveTab("Board");
+              setEpicError("");
+              try {
+                const sprint = mapSprint(await updateSprintRequest(selectedSprint.id, { status: "active" }));
+                setLocalEpics((currentEpics) =>
+                  currentEpics.map((epic) =>
+                    epic.id === epicId
+                      ? {
+                          ...epic,
+                          sprints: epic.sprints.map((epicSprint) =>
+                            epicSprint.id === selectedSprint.id
+                              ? { ...epicSprint, ...sprint, cards: epicSprint.cards }
+                              : epicSprint
+                          ),
+                        }
+                      : epic
+                  )
+                );
+                setActiveTab("Board");
+              } catch (error) {
+                setEpicError(error.message);
+              }
             }}
             onStatusChange={updateCardStatus}
             onToggleEpicMenu={(epicId) => {
@@ -828,7 +893,6 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       {isEditingSprint && (
         <SprintEditModal
           autoSchedule={autoScheduleSprint}
-          duration={sprintDuration}
           endDate={sprintEndDate}
           endTime={sprintEndTime}
           goal={sprintGoal}
@@ -836,7 +900,6 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           name={sprintName}
           onAutoScheduleChange={setAutoScheduleSprint}
           onClose={() => setIsEditingSprint(false)}
-          onDurationChange={setSprintDuration}
           onEndDateChange={setSprintEndDate}
           onEndTimeChange={setSprintEndTime}
           onGoalChange={setSprintGoal}
@@ -844,27 +907,43 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           onNameChange={setSprintName}
           onStartDateChange={setSprintStartDate}
           onStartTimeChange={setSprintStartTime}
-          onUpdate={() => {
-            setLocalEpics((currentEpics) =>
-              currentEpics.map((epic) =>
-                epic.id === activeSprintEpicId
-                  ? {
-                      ...epic,
-                      sprints: (epic.sprints ?? []).map((epicSprint) =>
-                        epicSprint.id === sprint?.id
-                          ? {
-                              ...epicSprint,
-                              title: sprintName,
-                              startDate: sprintStartDate,
-                              endDate: sprintEndDate,
-                            }
-                          : epicSprint
-                      ),
-                    }
-                  : epic
-              )
-            );
-            setIsEditingSprint(false);
+          onUpdate={async () => {
+            if (!sprint) {
+              return;
+            }
+
+            setEpicError("");
+            try {
+              const updatedSprint = mapSprint(
+                await updateSprintRequest(sprint.id, {
+                  name: sprintName,
+                  goal: sprintGoal || null,
+                  start_date: sprintStartDate || null,
+                  end_date: sprintEndDate || null,
+                })
+              );
+              setLocalEpics((currentEpics) =>
+                currentEpics.map((epic) =>
+                  epic.id === activeSprintEpicId
+                    ? {
+                        ...epic,
+                        sprints: (epic.sprints ?? []).map((epicSprint) =>
+                          epicSprint.id === sprint.id
+                            ? {
+                                ...epicSprint,
+                                ...updatedSprint,
+                                cards: epicSprint.cards,
+                              }
+                            : epicSprint
+                        ),
+                      }
+                    : epic
+                )
+              );
+              setIsEditingSprint(false);
+            } catch (error) {
+              setEpicError(error.message);
+            }
           }}
           startDate={sprintStartDate}
           startTime={sprintStartTime}
@@ -925,29 +1004,30 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       {isCreatingSprint && (
         <CreateSprintModal
           onClose={() => setIsCreatingSprint(false)}
-          onCreate={({ title, startDate, endDate }) => {
-            setLocalEpics((currentEpics) =>
-              currentEpics.map((epic) =>
-                epic.id === activeSprintEpicId
-                  ? {
-                      ...epic,
-                      sprints: [
-                        ...(epic.sprints ?? []),
-                        {
-                          id: `sprint-${Date.now()}`,
-                          title,
-                          startDate,
-                          endDate,
-                          archived: false,
-                          isStarted: false,
-                          cards: [],
-                        },
-                      ],
-                    }
-                  : epic
-              )
-            );
-            setIsCreatingSprint(false);
+          onCreate={async ({ title, startDate, endDate }) => {
+            setEpicError("");
+            try {
+              const sprint = mapSprint(
+                await createSprintRequest(activeSprintEpicId, {
+                  title,
+                  startDate,
+                  endDate,
+                })
+              );
+              setLocalEpics((currentEpics) =>
+                currentEpics.map((epic) =>
+                  epic.id === activeSprintEpicId
+                    ? {
+                        ...epic,
+                        sprints: [...(epic.sprints ?? []), sprint],
+                      }
+                    : epic
+                )
+              );
+              setIsCreatingSprint(false);
+            } catch (error) {
+              setEpicError(error.message);
+            }
           }}
         />
       )}

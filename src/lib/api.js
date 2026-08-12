@@ -217,3 +217,49 @@ export async function permanentlyDeleteEpic(epicId) {
     method: "DELETE",
   });
 }
+
+export async function listEpicSprints(epicId) {
+  const payload = await apiFetch(`/epics/${epicId}/sprints`);
+  return payload.data;
+}
+
+export async function createSprint(epicId, { endDate, goal, startDate, title }) {
+  const payload = await apiFetch(`/epics/${epicId}/sprints`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: title,
+      goal: goal || null,
+      start_date: startDate || null,
+      end_date: endDate || null,
+      status: "planned",
+    }),
+  });
+  return payload.data;
+}
+
+export async function updateSprint(sprintId, updates) {
+  const payload = await apiFetch(`/sprints/${sprintId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+  return payload.data;
+}
+
+export async function archiveSprint(sprintId) {
+  return apiFetch(`/sprints/${sprintId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function restoreSprint(sprintId) {
+  const payload = await apiFetch(`/sprints/${sprintId}/restore`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function permanentlyDeleteSprint(sprintId) {
+  return apiFetch(`/sprints/${sprintId}/permanent`, {
+    method: "DELETE",
+  });
+}

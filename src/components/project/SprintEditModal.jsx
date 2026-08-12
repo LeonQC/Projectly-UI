@@ -2,7 +2,6 @@ import React from "react";
 
 function SprintEditModal({
   autoSchedule,
-  duration,
   endDate,
   endTime,
   goal,
@@ -10,7 +9,6 @@ function SprintEditModal({
   name,
   onAutoScheduleChange,
   onClose,
-  onDurationChange,
   onEndDateChange,
   onEndTimeChange,
   onGoalChange,
@@ -49,16 +47,6 @@ function SprintEditModal({
               Sprint name <span className="required-mark">*</span>
             </span>
             <input type="text" value={name} onChange={(event) => onNameChange(event.target.value)} />
-          </label>
-
-          <label className="modal-field">
-            <span>Duration</span>
-            <select value={duration} onChange={(event) => onDurationChange(event.target.value)}>
-              <option value="custom">custom</option>
-              <option value="1 week">1 week</option>
-              <option value="2 weeks">2 weeks</option>
-              <option value="4 weeks">4 weeks</option>
-            </select>
           </label>
 
           <label className="modal-field">

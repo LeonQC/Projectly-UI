@@ -116,3 +116,56 @@ export async function permanentlyDeleteWorkspace(workspaceId) {
     method: "DELETE",
   });
 }
+
+export async function listWorkspaceProjects(workspaceId) {
+  const payload = await apiFetch(`/workspaces/${workspaceId}/projects`);
+  return payload.data;
+}
+
+export async function listArchivedProjects() {
+  const payload = await apiFetch("/projects/deleted");
+  return payload.data;
+}
+
+export async function createProject(workspaceId, { description, title }) {
+  const payload = await apiFetch(`/workspaces/${workspaceId}/projects`, {
+    method: "POST",
+    body: JSON.stringify({
+      name: title,
+      description,
+    }),
+  });
+  return payload.data;
+}
+
+export async function getProject(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}`);
+  return payload.data;
+}
+
+export async function updateProject(projectId, updates) {
+  const payload = await apiFetch(`/projects/${projectId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+  return payload.data;
+}
+
+export async function archiveProject(projectId) {
+  return apiFetch(`/projects/${projectId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function restoreProject(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}/restore`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function permanentlyDeleteProject(projectId) {
+  return apiFetch(`/projects/${projectId}/permanent`, {
+    method: "DELETE",
+  });
+}

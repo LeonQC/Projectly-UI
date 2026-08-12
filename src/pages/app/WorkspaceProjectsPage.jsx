@@ -7,7 +7,7 @@ import WorkspaceSettings from "../../components/workspace/WorkspaceSettings.jsx"
 import WorkspaceTabs from "../../components/workspace/WorkspaceTabs.jsx";
 
 function WorkspaceProjectsPage({
-  archivedProjectIds = [],
+  archivedProjects = [],
   createProjectRequestId,
   initialTab = "projects",
   onArchiveProject,
@@ -22,8 +22,7 @@ function WorkspaceProjectsPage({
 }) {
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState(initialTab ?? "projects");
   const [isCreatingProject, setIsCreatingProject] = useState(false);
-  const activeProjects = workspace.projects.filter((project) => !archivedProjectIds.includes(project.id));
-  const archivedProjects = workspace.projects.filter((project) => archivedProjectIds.includes(project.id));
+  const activeProjects = workspace.projects.filter((project) => !project.archived);
 
   useEffect(() => {
     if (shouldOpenCreateProject) {

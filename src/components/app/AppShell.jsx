@@ -1,11 +1,19 @@
 import React, { useEffect, useState } from "react";
 import {
+  archiveProject as archiveProjectRequest,
   archiveWorkspace as archiveWorkspaceRequest,
+  createProject as createProjectRequest,
+  getProject as getProjectRequest,
   createWorkspace as createWorkspaceRequest,
+  listArchivedProjects,
   listArchivedWorkspaces,
+  listWorkspaceProjects,
   listWorkspaces,
+  permanentlyDeleteProject as permanentlyDeleteProjectRequest,
   permanentlyDeleteWorkspace as permanentlyDeleteWorkspaceRequest,
+  restoreProject as restoreProjectRequest,
   restoreWorkspace as restoreWorkspaceRequest,
+  updateProject as updateProjectRequest,
   updateWorkspace as updateWorkspaceRequest,
 } from "../../lib/api.js";
 import { guestWorkspaces, inboxItems, user } from "../../data/mockWorkspaceData.js";
@@ -38,6 +46,18 @@ function mapWorkspace(workspace) {
   };
 }
 
+function mapProject(project) {
+  return {
+    ...project,
+    id: project.id,
+    workspaceId: project.workspace_id ?? project.workspaceId,
+    workspace_id: project.workspace_id ?? project.workspaceId,
+    name: project.name,
+    description: project.description ?? "",
+    epics: project.epics ?? [],
+  };
+}
+
 function AppShell({ currentUser, onLogout }) {
   const sidebarUser = currentUser
     ? {
@@ -51,7 +71,7 @@ function AppShell({ currentUser, onLogout }) {
     : user;
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
   const [activePage, setActivePage] = useState({ name: "all-projects" });
-  const [archivedProjectIds, setArchivedProjectIds] = useState([]);
+  const [archivedProjects, setArchivedProjects] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
   const [archivedWorkspaces, setArchivedWorkspaces] = useState([]);
   const [workspaceError, setWorkspaceError] = useState("");
@@ -65,13 +85,14 @@ function AppShell({ currentUser, onLogout }) {
     workspaces.find((workspace) =>
       workspace.projects.some((project) => project.id === activeProject?.id)
     ) ?? workspaces[0] ?? null;
-  const archivedProjects = workspaces.flatMap((workspace) =>
-    workspace.projects
-      .filter((project) => archivedProjectIds.includes(project.id))
-      .map((project) => ({
-        ...project,
-        workspaceName: workspace.name,
-      }))
+  const archivedProjectsWithWorkspace = archivedProjects.map((project) => ({
+    ...project,
+    workspaceName:
+      workspaces.find((workspace) => workspace.id === project.workspace_id)?.name ??
+      archivedWorkspaces.find((workspace) => workspace.id === project.workspace_id)?.name,
+  }));
+  const activeWorkspaceArchivedProjects = archivedProjects.filter(
+    (project) => project.workspace_id === activeWorkspace?.id
   );
 
   useEffect(() => {
@@ -81,17 +102,25 @@ function AppShell({ currentUser, onLogout }) {
       setIsLoadingWorkspaces(true);
       setWorkspaceError("");
       try {
-        const [activeWorkspaceData, archivedWorkspaceData] = await Promise.all([
+        const [activeWorkspaceData, archivedWorkspaceData, archivedProjectData] = await Promise.all([
           listWorkspaces(),
           listArchivedWorkspaces(),
+          listArchivedProjects(),
         ]);
+        const workspacesWithProjects = await Promise.all(
+          activeWorkspaceData.map(async (workspace) => ({
+            ...mapWorkspace(workspace),
+            projects: (await listWorkspaceProjects(workspace.id)).map(mapProject),
+          }))
+        );
 
         if (!isMounted) {
           return;
         }
 
-        setWorkspaces(activeWorkspaceData.map(mapWorkspace));
+        setWorkspaces(workspacesWithProjects);
         setArchivedWorkspaces(archivedWorkspaceData.map(mapWorkspace));
+        setArchivedProjects(archivedProjectData.map(mapProject));
       } catch (error) {
         if (isMounted) {
           setWorkspaceError(error.message);
@@ -110,39 +139,83 @@ function AppShell({ currentUser, onLogout }) {
     };
   }, []);
 
-  function archiveProject(projectId) {
-    setArchivedProjectIds((projectIds) =>
-      projectIds.includes(projectId) ? projectIds : [...projectIds, projectId]
-    );
-
+  async function archiveProject(projectId) {
     const projectWorkspace = workspaces.find((workspace) =>
       workspace.projects.some((project) => project.id === projectId)
     );
+    const project = projectWorkspace?.projects.find((workspaceProject) => workspaceProject.id === projectId);
 
-    if (projectWorkspace) {
+    if (!projectWorkspace || !project) {
+      return;
+    }
+
+    setWorkspaceError("");
+    try {
+      await archiveProjectRequest(projectId);
+      setWorkspaces((currentWorkspaces) =>
+        currentWorkspaces.map((workspace) =>
+          workspace.id === projectWorkspace.id
+            ? {
+                ...workspace,
+                projects: workspace.projects.filter((workspaceProject) => workspaceProject.id !== projectId),
+              }
+            : workspace
+        )
+      );
+      setArchivedProjects((currentProjects) => [{ ...project, archived: true }, ...currentProjects]);
       setActivePage({
         name: "workspace-projects",
         workspaceId: projectWorkspace.id,
         workspaceTab: "archived-projects",
       });
+    } catch (error) {
+      setWorkspaceError(error.message);
     }
   }
 
-  function restoreProject(projectId) {
-    setArchivedProjectIds((projectIds) => projectIds.filter((archivedProjectId) => archivedProjectId !== projectId));
+  async function restoreProject(projectId) {
+    setWorkspaceError("");
+    try {
+      const project = mapProject(await restoreProjectRequest(projectId));
+      setArchivedProjects((currentProjects) =>
+        currentProjects.filter((currentProject) => currentProject.id !== projectId)
+      );
+      setWorkspaces((currentWorkspaces) =>
+        currentWorkspaces.map((workspace) =>
+          workspace.id === project.workspace_id
+            ? { ...workspace, projects: [...workspace.projects, project] }
+            : workspace
+        )
+      );
+      setActivePage({
+        name: "workspace-projects",
+        workspaceId: project.workspace_id,
+        workspaceTab: "projects",
+      });
+    } catch (error) {
+      setWorkspaceError(error.message);
+    }
   }
 
-  function permanentlyDeleteProject(projectId) {
-    setArchivedProjectIds((projectIds) => projectIds.filter((archivedProjectId) => archivedProjectId !== projectId));
-    setWorkspaces((currentWorkspaces) =>
-      currentWorkspaces.map((workspace) => ({
-        ...workspace,
-        projects: workspace.projects.filter((project) => project.id !== projectId),
-      }))
-    );
+  async function permanentlyDeleteProject(projectId) {
+    setWorkspaceError("");
+    try {
+      await permanentlyDeleteProjectRequest(projectId);
+      setArchivedProjects((currentProjects) =>
+        currentProjects.filter((currentProject) => currentProject.id !== projectId)
+      );
+      setWorkspaces((currentWorkspaces) =>
+        currentWorkspaces.map((workspace) => ({
+          ...workspace,
+          projects: workspace.projects.filter((project) => project.id !== projectId),
+        }))
+      );
 
-    if (activePage.projectId === projectId) {
-      setActivePage({ name: "archived-workspace" });
+      if (activePage.projectId === projectId) {
+        setActivePage({ name: "archived-workspace" });
+      }
+    } catch (error) {
+      setWorkspaceError(error.message);
     }
   }
 
@@ -172,54 +245,90 @@ function AppShell({ currentUser, onLogout }) {
     });
   }
 
-  function openProject(projectId) {
+  async function openProject(projectId) {
     const projectWorkspace = workspaces.find((workspace) =>
       workspace.projects.some((project) => project.id === projectId)
     );
 
-    setActivePage({
-      name: "project-backlog",
-      projectId,
-      workspaceId: projectWorkspace?.id,
-    });
-  }
-
-  function createProject(workspaceId, projectInput) {
-    const projectId = `project-${Date.now()}`;
-
-    setWorkspaces((currentWorkspaces) =>
-      currentWorkspaces.map((workspace) =>
-        workspace.id === workspaceId
-          ? {
-              ...workspace,
-              projects: [
-                ...workspace.projects,
-                {
-                  id: projectId,
-                  name: projectInput.title,
-                  description: projectInput.description,
-                },
-              ],
-            }
-          : workspace
-      )
-    );
-  }
-
-  function updateProject(projectId, projectInput) {
-    setWorkspaces((currentWorkspaces) =>
-      currentWorkspaces.map((workspace) => ({
-        ...workspace,
-        projects: workspace.projects.map((project) =>
-          project.id === projectId
+    setWorkspaceError("");
+    try {
+      const project = mapProject(await getProjectRequest(projectId));
+      setWorkspaces((currentWorkspaces) =>
+        currentWorkspaces.map((workspace) =>
+          workspace.id === project.workspace_id
             ? {
-                ...project,
-                ...projectInput,
+                ...workspace,
+                projects: workspace.projects.map((currentProject) =>
+                  currentProject.id === project.id
+                    ? {
+                        ...currentProject,
+                        ...project,
+                        epics: currentProject.epics,
+                      }
+                    : currentProject
+                ),
               }
-            : project
-        ),
-      }))
-    );
+            : workspace
+        )
+      );
+
+      setActivePage({
+        name: "project-backlog",
+        projectId,
+        workspaceId: project.workspace_id,
+      });
+    } catch (error) {
+      setWorkspaceError(error.message);
+      if (projectWorkspace) {
+        setActivePage({
+          name: "project-backlog",
+          projectId,
+          workspaceId: projectWorkspace.id,
+        });
+      }
+    }
+  }
+
+  async function createProject(workspaceId, projectInput) {
+    setWorkspaceError("");
+    try {
+      const project = mapProject(await createProjectRequest(workspaceId, projectInput));
+      setWorkspaces((currentWorkspaces) =>
+        currentWorkspaces.map((workspace) =>
+          workspace.id === workspaceId
+            ? {
+                ...workspace,
+                projects: [...workspace.projects, project],
+              }
+            : workspace
+        )
+      );
+    } catch (error) {
+      setWorkspaceError(error.message);
+    }
+  }
+
+  async function updateProject(projectId, projectInput) {
+    setWorkspaceError("");
+    try {
+      const project = mapProject(await updateProjectRequest(projectId, projectInput));
+      setWorkspaces((currentWorkspaces) =>
+        currentWorkspaces.map((workspace) => ({
+          ...workspace,
+          projects: workspace.projects.map((currentProject) =>
+            currentProject.id === projectId
+              ? {
+                  ...currentProject,
+                  ...project,
+                  epics: currentProject.epics,
+                }
+              : currentProject
+          ),
+        }))
+      );
+    } catch (error) {
+      setWorkspaceError(error.message);
+    }
   }
 
   async function createWorkspace(workspaceInput) {
@@ -364,7 +473,7 @@ function AppShell({ currentUser, onLogout }) {
             onPermanentlyDeleteWorkspace={permanentlyDeleteWorkspace}
             onRestoreProject={restoreProject}
             onRestoreWorkspace={restoreWorkspace}
-            projects={archivedProjects}
+            projects={archivedProjectsWithWorkspace}
             workspaces={archivedWorkspaces}
           />
         </section>
@@ -377,7 +486,7 @@ function AppShell({ currentUser, onLogout }) {
         />
       ) : activePage.name === "workspace-projects" && activeWorkspace ? (
         <WorkspaceProjectsPage
-          archivedProjectIds={archivedProjectIds}
+          archivedProjects={activeWorkspaceArchivedProjects}
           createProjectRequestId={activePage.createProjectRequestId}
           initialTab={activePage.workspaceTab}
           onArchiveWorkspace={archiveWorkspace}
@@ -400,7 +509,6 @@ function AppShell({ currentUser, onLogout }) {
           ) : (
             <AllProjectsPage
               guestWorkspaces={guestWorkspaces}
-              archivedProjectIds={archivedProjectIds}
               onOpenProject={openProject}
               onOpenWorkspaceProjects={openWorkspaceProjects}
               workspaces={workspaces}

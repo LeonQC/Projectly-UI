@@ -263,3 +263,67 @@ export async function permanentlyDeleteSprint(sprintId) {
     method: "DELETE",
   });
 }
+
+export async function listProjectCards(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}/cards`);
+  return payload.data;
+}
+
+export async function listArchivedProjectCards(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}/cards/archived`);
+  return payload.data;
+}
+
+export async function createCard(projectId, { description, epicId, position = 0, status = "backlog", title }) {
+  const payload = await apiFetch(`/projects/${projectId}/cards`, {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+      description,
+      epic_id: epicId ?? null,
+      status,
+      position,
+    }),
+  });
+  return payload.data;
+}
+
+export async function getCard(cardId) {
+  const payload = await apiFetch(`/cards/${cardId}`);
+  return payload.data;
+}
+
+export async function updateCard(cardId, updates) {
+  const payload = await apiFetch(`/cards/${cardId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+  return payload.data;
+}
+
+export async function moveCard(cardId, updates) {
+  const payload = await apiFetch(`/cards/${cardId}/move`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+  return payload.data;
+}
+
+export async function archiveCard(cardId) {
+  return apiFetch(`/cards/${cardId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function restoreCard(cardId) {
+  const payload = await apiFetch(`/cards/${cardId}/restore`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function permanentlyDeleteCard(cardId) {
+  return apiFetch(`/cards/${cardId}/permanent`, {
+    method: "DELETE",
+  });
+}

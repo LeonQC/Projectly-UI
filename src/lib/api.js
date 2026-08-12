@@ -169,3 +169,51 @@ export async function permanentlyDeleteProject(projectId) {
     method: "DELETE",
   });
 }
+
+export async function listProjectEpics(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}/epics`);
+  return payload.data;
+}
+
+export async function createEpic(projectId, { deadline, title }) {
+  const payload = await apiFetch(`/projects/${projectId}/epics`, {
+    method: "POST",
+    body: JSON.stringify({
+      title,
+      deadline: deadline || null,
+    }),
+  });
+  return payload.data;
+}
+
+export async function getEpic(epicId) {
+  const payload = await apiFetch(`/epics/${epicId}`);
+  return payload.data;
+}
+
+export async function updateEpic(epicId, updates) {
+  const payload = await apiFetch(`/epics/${epicId}`, {
+    method: "PATCH",
+    body: JSON.stringify(updates),
+  });
+  return payload.data;
+}
+
+export async function archiveEpic(epicId) {
+  return apiFetch(`/epics/${epicId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function restoreEpic(epicId) {
+  const payload = await apiFetch(`/epics/${epicId}/restore`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function permanentlyDeleteEpic(epicId) {
+  return apiFetch(`/epics/${epicId}/permanent`, {
+    method: "DELETE",
+  });
+}

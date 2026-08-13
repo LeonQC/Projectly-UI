@@ -1,4 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
+import {
+  createCardAttachment,
+  createCardLabel,
+  createCardLink,
+  createCardMember,
+  deleteCardAttachment,
+  deleteCardLabel,
+  deleteCardLink,
+  deleteCardMember,
+  getCardDetail,
+  listProjectMembers,
+} from "../../lib/api.js";
 
 const defaultCardStatuses = [
   { label: "Todo", value: "todo" },
@@ -23,6 +35,112 @@ const labelColors = [
   { name: "Gray", value: "gray" },
 ];
 
+function getInitials(name) {
+  return (name || "User")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function formatDateTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function formatRelationship(relationship) {
+  return relationship.replaceAll("_", " ");
+}
+
+function toApiRelationship(relationship) {
+  return relationship.replaceAll(" ", "_");
+}
+
+function fromApiCardStatus(status) {
+  return status === "in_progress" ? "in-progress" : status;
+}
+
+function mapUser(user) {
+  const name = user?.username || user?.email || `User ${user?.id ?? ""}`.trim();
+
+  return {
+    id: user?.id,
+    initials: getInitials(name),
+    name,
+    username: user?.email ? `@${user.email.split("@")[0]}` : `@user-${user?.id ?? "unknown"}`,
+  };
+}
+
+function mapDetailLabel(label) {
+  return {
+    id: label.id,
+    text: label.name,
+    color: label.color || "gray",
+  };
+}
+
+function mapDetailMember(member) {
+  return {
+    ...mapUser(member.user),
+    cardMemberId: member.id,
+  };
+}
+
+function mapProjectMember(member) {
+  return {
+    ...mapUser(member.user),
+    membershipType: member.membership_type,
+    role: member.role,
+  };
+}
+
+function mapDetailAttachment(attachment) {
+  return {
+    id: attachment.id,
+    name: attachment.file_name,
+    size: attachment.file_size ?? 0,
+    url: attachment.file_url,
+    type: attachment.file_type,
+  };
+}
+
+function mapDetailComment(comment, projectMembers) {
+  const author = projectMembers.find((member) => String(member.id) === String(comment.author_id)) ?? {
+    id: comment.author_id,
+    initials: getInitials(`User ${comment.author_id}`),
+    name: `User ${comment.author_id}`,
+    username: `@user-${comment.author_id}`,
+  };
+
+  return {
+    id: comment.id,
+    author,
+    body: comment.body,
+    attachments: (comment.attachments ?? []).map(mapDetailAttachment),
+    createdAt: formatDateTime(comment.created_at),
+    editedAt: comment.updated_at !== comment.created_at ? `Edited ${formatDateTime(comment.updated_at)}` : "",
+  };
+}
+
+function mapDetailLink(link, cardId) {
+  const linkedCard = String(link.source_card_id) === String(cardId) ? link.target_card : link.source_card;
+
+  return {
+    id: link.id,
+    cardId: linkedCard.id,
+    relation: formatRelationship(link.relationship),
+    title: linkedCard.title,
+  };
+}
+
 function CardDetailModal({
   card,
   linkedWorkItemOptions = [],
@@ -37,7 +155,12 @@ function CardDetailModal({
 }) {
   const [activeTab, setActiveTab] = useState("Members");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [detailCard, setDetailCard] = useState(card);
+  const [detailError, setDetailError] = useState("");
+  const [isLoadingDetail, setIsLoadingDetail] = useState(true);
+  const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [titleDraft, setTitleDraft] = useState(card.title ?? "");
+  const [descriptionDraft, setDescriptionDraft] = useState(card.description ?? "");
   const [sprintId, setSprintId] = useState(card.sprintId ?? "backlog");
   const [linkedRelation, setLinkedRelation] = useState(workItemRelations[0]);
   const [linkedCardId, setLinkedCardId] = useState("");
@@ -46,15 +169,14 @@ function CardDetailModal({
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [newStatusTitle, setNewStatusTitle] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
-  const [selectedMembers, setSelectedMembers] = useState(projectMembers.slice(0, 1));
+  const [projectAccessMembers, setProjectAccessMembers] = useState(projectMembers);
+  const [selectedMembers, setSelectedMembers] = useState([]);
   const [memberPendingRemoveId, setMemberPendingRemoveId] = useState(null);
   const [labelText, setLabelText] = useState("");
   const [labelColor, setLabelColor] = useState("purple");
   const [labelPendingRemoveId, setLabelPendingRemoveId] = useState(null);
-  const [labels, setLabels] = useState([
-    { id: "label-1", text: "Planning", color: "purple" },
-    { id: "label-2", text: "Ready", color: "green" },
-  ]);
+  const [labels, setLabels] = useState([]);
+  const [cardAttachments, setCardAttachments] = useState([]);
   const [commentText, setCommentText] = useState("");
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [comments, setComments] = useState([]);
@@ -68,11 +190,16 @@ function CardDetailModal({
   const commentInputRef = useRef(null);
   const commentEditorRef = useRef(null);
   const attachmentInputRef = useRef(null);
-  const filteredMembers = projectMembers.filter((member) => {
+  const cardAttachmentInputRef = useRef(null);
+  const displayCard = detailCard ?? card;
+  const filteredMembers = projectAccessMembers.filter((member) => {
     const searchValue = `${member.name} ${member.username}`.toLowerCase();
-    return searchValue.includes(memberSearch.toLowerCase());
+    return (
+      searchValue.includes(memberSearch.toLowerCase()) &&
+      !selectedMembers.some((selectedMember) => String(selectedMember.id) === String(member.id))
+    );
   });
-  const currentUser = projectMembers[0] ?? {
+  const currentUser = projectAccessMembers[0] ?? {
     id: "current-user",
     initials: "ME",
     name: "You",
@@ -81,13 +208,13 @@ function CardDetailModal({
   const mentionMatch = commentText.match(/(?:^|\s)@([\w-]*)$/);
   const mentionSearch = mentionMatch?.[1].toLowerCase() ?? "";
   const mentionOptions = isMentionMenuOpen && mentionMatch
-    ? projectMembers.filter((member) => {
+    ? projectAccessMembers.filter((member) => {
         const username = member.username.replace(/^@/, "").toLowerCase();
         return username.includes(mentionSearch) || member.name.toLowerCase().includes(mentionSearch);
       })
     : [];
-  const availableLinkedWorkItems = linkedWorkItemOptions.filter((workItem) => workItem.id !== card.id);
-  const selectedLinkedCard = availableLinkedWorkItems.find((workItem) => workItem.id === linkedCardId);
+  const availableLinkedWorkItems = linkedWorkItemOptions.filter((workItem) => String(workItem.id) !== String(card.id));
+  const selectedLinkedCard = availableLinkedWorkItems.find((workItem) => String(workItem.id) === String(linkedCardId));
   const hasDuplicateLinkedWorkItem =
     selectedLinkedCard &&
     linkedWorkItems.some(
@@ -95,60 +222,107 @@ function CardDetailModal({
         linkedItem.cardId === selectedLinkedCard.id && linkedItem.relation === linkedRelation
     );
 
-  function addLinkedWorkItem(event) {
+  async function addLinkedWorkItem(event) {
     event.preventDefault();
 
     if (!selectedLinkedCard || hasDuplicateLinkedWorkItem) {
       return;
     }
 
-    setLinkedWorkItems((currentItems) => [
-      ...currentItems,
-      {
-        id: `linked-${Date.now()}`,
-        cardId: selectedLinkedCard.id,
-        relation: linkedRelation,
-        title: selectedLinkedCard.title,
-      },
-    ]);
-    setLinkedCardId("");
-    setLinkedRelation(workItemRelations[0]);
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      const link = await createCardLink(card.id, {
+        relationship: toApiRelationship(linkedRelation),
+        targetCardId: Number(selectedLinkedCard.id),
+      });
+      setLinkedWorkItems((currentItems) => [
+        ...currentItems,
+        mapDetailLink(link, card.id),
+      ]);
+      setLinkedCardId("");
+      setLinkedRelation(workItemRelations[0]);
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
   }
 
-  function addMember(member) {
-    setSelectedMembers((members) =>
-      members.some((selectedMember) => selectedMember.id === member.id)
-        ? members
-        : [...members, member]
-    );
-  }
-
-  function addLabel(event) {
-    event.preventDefault();
-
-    if (!labelText.trim()) {
+  async function addMember(member) {
+    if (selectedMembers.some((selectedMember) => String(selectedMember.id) === String(member.id))) {
       return;
     }
 
-    setLabels((currentLabels) => [
-      ...currentLabels,
-      {
-        id: `label-${Date.now()}`,
-        text: labelText.trim(),
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      const cardMember = await createCardMember(card.id, member.id);
+      setSelectedMembers((members) => [...members, mapDetailMember(cardMember)]);
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
+  }
+
+  async function addLabel(event) {
+    event.preventDefault();
+
+    const normalizedLabel = labelText.trim();
+
+    if (!normalizedLabel) {
+      return;
+    }
+
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      const label = await createCardLabel(card.id, {
+        name: normalizedLabel,
         color: labelColor,
-      },
-    ]);
-    setLabelText("");
+      });
+      setLabels((currentLabels) => [...currentLabels, mapDetailLabel(label)]);
+      setLabelText("");
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
   }
 
-  function removeMember(memberId) {
-    setSelectedMembers((members) => members.filter((member) => member.id !== memberId));
-    setMemberPendingRemoveId(null);
+  async function removeMember(memberId) {
+    const member = selectedMembers.find((selectedMember) => String(selectedMember.id) === String(memberId));
+
+    if (!member?.cardMemberId) {
+      return;
+    }
+
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      await deleteCardMember(member.cardMemberId);
+      setSelectedMembers((members) => members.filter((currentMember) => String(currentMember.id) !== String(memberId)));
+      setMemberPendingRemoveId(null);
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
   }
 
-  function removeLabel(labelId) {
-    setLabels((currentLabels) => currentLabels.filter((label) => label.id !== labelId));
-    setLabelPendingRemoveId(null);
+  async function removeLabel(labelId) {
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      await deleteCardLabel(labelId);
+      setLabels((currentLabels) => currentLabels.filter((label) => String(label.id) !== String(labelId)));
+      setLabelPendingRemoveId(null);
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
   }
 
   function createStatus(event) {
@@ -184,6 +358,68 @@ function CardDetailModal({
       })),
     ]);
     event.target.value = "";
+  }
+
+  async function addCardAttachments(event) {
+    const selectedFiles = Array.from(event.target.files ?? []);
+
+    if (selectedFiles.length === 0) {
+      return;
+    }
+
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      const savedAttachments = await Promise.all(
+        selectedFiles.map((file) =>
+          createCardAttachment(card.id, {
+            fileName: file.name,
+            fileUrl: URL.createObjectURL(file),
+            fileType: file.type || null,
+            fileSize: file.size,
+          })
+        )
+      );
+      setCardAttachments((currentAttachments) => [
+        ...currentAttachments,
+        ...savedAttachments.map(mapDetailAttachment),
+      ]);
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      event.target.value = "";
+      setIsSavingDetail(false);
+    }
+  }
+
+  async function removeCardAttachment(attachmentId) {
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      await deleteCardAttachment(attachmentId);
+      setCardAttachments((attachments) =>
+        attachments.filter((attachment) => String(attachment.id) !== String(attachmentId))
+      );
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
+  }
+
+  async function removeLinkedWorkItem(linkId) {
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      await deleteCardLink(linkId);
+      setLinkedWorkItems((currentItems) =>
+        currentItems.filter((item) => String(item.id) !== String(linkId))
+      );
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
   }
 
   function formatAttachmentSize(size) {
@@ -284,6 +520,7 @@ function CardDetailModal({
     }
 
     onUpdateCard?.(card.id, {
+      description: descriptionDraft.trim(),
       title: trimmedTitle,
       sprintId: sprintId === "backlog" ? null : sprintId,
     });
@@ -291,9 +528,66 @@ function CardDetailModal({
   }
 
   useEffect(() => {
-    setTitleDraft(card.title ?? "");
-    setSprintId(card.sprintId ?? "backlog");
-  }, [card.id, card.sprintId, card.title]);
+    let isMounted = true;
+
+    async function loadCardDetail() {
+      setIsLoadingDetail(true);
+      setDetailError("");
+      setDetailCard(card);
+      setTitleDraft(card.title ?? "");
+      setDescriptionDraft(card.description ?? "");
+      setSprintId(card.sprintId ?? "backlog");
+      setLabels([]);
+      setSelectedMembers([]);
+      setCardAttachments([]);
+      setComments([]);
+      setLinkedWorkItems([]);
+
+      try {
+        const detail = await getCardDetail(card.id);
+
+        if (!isMounted) {
+          return;
+        }
+
+        const nextCard = {
+          ...card,
+          ...detail.card,
+          status: fromApiCardStatus(detail.card.status) ?? card.status,
+          sprintId: detail.card.sprint_id ?? card.sprintId ?? null,
+          sprint_id: detail.card.sprint_id ?? card.sprintId ?? null,
+          epicId: detail.card.epic_id ?? card.epicId ?? null,
+          epic_id: detail.card.epic_id ?? card.epicId ?? null,
+        };
+        const projectMemberData = await listProjectMembers(nextCard.project_id);
+
+        setDetailCard(nextCard);
+        setTitleDraft(nextCard.title ?? "");
+        setDescriptionDraft(nextCard.description ?? "");
+        setSprintId(nextCard.sprintId ?? "backlog");
+        setProjectAccessMembers((projectMemberData ?? []).map(mapProjectMember));
+        setLabels((detail.labels ?? []).map(mapDetailLabel));
+        setSelectedMembers((detail.members ?? []).map(mapDetailMember));
+        setCardAttachments((detail.attachments ?? []).map(mapDetailAttachment));
+        setComments((detail.comments ?? []).map((comment) => mapDetailComment(comment, (projectMemberData ?? []).map(mapProjectMember))));
+        setLinkedWorkItems((detail.links ?? []).map((link) => mapDetailLink(link, card.id)));
+      } catch (error) {
+        if (isMounted) {
+          setDetailError(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDetail(false);
+        }
+      }
+    }
+
+    loadCardDetail();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [card.id]);
 
   useEffect(() => {
     function closeDropdownsOnOutsideClick(event) {
@@ -338,7 +632,7 @@ function CardDetailModal({
                 aria-expanded={isStatusMenuOpen}
                 onClick={() => setIsStatusMenuOpen((isOpen) => !isOpen)}
               >
-                {statuses.find((status) => status.value === card.status)?.label ?? "Todo"}
+                {statuses.find((status) => status.value === displayCard.status)?.label ?? "Todo"}
                 <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
                   <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
                 </svg>
@@ -347,7 +641,7 @@ function CardDetailModal({
                 <div className="card-status-dropdown card-detail-status-dropdown" role="menu">
                   {statuses.map((status) => (
                     <button
-                      className={card.status === status.value ? "is-active" : ""}
+                      className={displayCard.status === status.value ? "is-active" : ""}
                       type="button"
                       role="menuitem"
                       onClick={() => {
@@ -433,7 +727,7 @@ function CardDetailModal({
         <div className="card-detail-body">
           <section className="card-detail-main">
             <label className="card-title-row">
-              <input type="checkbox" defaultChecked={card.completed} />
+              <input type="checkbox" defaultChecked={displayCard.completed} />
               <input
                 className="card-title-input"
                 id="card-detail-title"
@@ -443,6 +737,8 @@ function CardDetailModal({
                 onChange={(event) => setTitleDraft(event.target.value)}
               />
             </label>
+            {isLoadingDetail && <p className="empty-state">Loading card details...</p>}
+            {detailError && <p className="app-error">{detailError}</p>}
 
             <nav className="card-detail-tabs" aria-label="Card detail tabs">
               {cardTabs.map((tab) => (
@@ -467,33 +763,44 @@ function CardDetailModal({
                     onChange={(event) => setMemberSearch(event.target.value)}
                   />
                   <div className="selected-member-list">
-                    {selectedMembers.map((member) => (
-                      <span className="selected-member-chip" key={member.id} ref={memberPendingRemoveId === member.id ? memberRemoveRef : null}>
-                        <button
-                          className="selected-member-avatar-button"
-                          type="button"
-                          aria-label={`Show remove option for ${member.name}`}
-                          onClick={() => setMemberPendingRemoveId(member.id)}
+                    {selectedMembers.length > 0 ? (
+                      selectedMembers.map((member) => (
+                        <span
+                          className="selected-member-chip"
+                          key={member.id}
+                          ref={memberPendingRemoveId === member.id ? memberRemoveRef : null}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            setMemberPendingRemoveId(member.id);
+                          }}
                         >
-                          <span className="member-avatar">{member.initials}</span>
-                        </button>
-                        {member.name}
-                        {memberPendingRemoveId === member.id && (
-                          <span className="chip-remove-dropdown">
-                            <button
-                              type="button"
-                              onClick={() => removeMember(member.id)}
-                            >
-                              Remove
-                            </button>
-                          </span>
-                        )}
-                      </span>
-                    ))}
+                          <button
+                            className="selected-member-avatar-button"
+                            type="button"
+                            aria-label={member.name}
+                          >
+                            <span className="member-avatar">{member.initials}</span>
+                          </button>
+                          {member.name}
+                          {memberPendingRemoveId === member.id && (
+                            <span className="chip-remove-dropdown">
+                              <button
+                                type="button"
+                                onClick={() => removeMember(member.id)}
+                              >
+                                Remove
+                              </button>
+                            </span>
+                          )}
+                        </span>
+                      ))
+                    ) : (
+                      <p className="empty-state">No members assigned.</p>
+                    )}
                   </div>
                   <div className="member-search-results">
                     {filteredMembers.map((member) => (
-                      <button type="button" onClick={() => addMember(member)} key={member.id}>
+                      <button type="button" disabled={isSavingDetail} onClick={() => addMember(member)} key={member.id}>
                         <span className="member-avatar">{member.initials}</span>
                         <span>{member.name}</span>
                         <small>{member.username}</small>
@@ -517,7 +824,7 @@ function CardDetailModal({
                         </option>
                       ))}
                     </select>
-                    <button className="small-action-button" type="submit">
+                    <button className="small-action-button" type="submit" disabled={isSavingDetail || !labelText.trim()}>
                       Add label
                     </button>
                   </form>
@@ -546,9 +853,38 @@ function CardDetailModal({
                   </div>
                 </div>
               ) : (
-                <button className="small-action-button" type="button">
-                  Add attachment
-                </button>
+                <div className="card-attachment-panel">
+                  <input
+                    ref={cardAttachmentInputRef}
+                    className="visually-hidden"
+                    type="file"
+                    multiple
+                    onChange={addCardAttachments}
+                  />
+                  <button
+                    className="small-action-button"
+                    type="button"
+                    disabled={isSavingDetail}
+                    onClick={() => cardAttachmentInputRef.current?.click()}
+                  >
+                    Add attachment
+                  </button>
+                  <div className="comment-item-attachments">
+                    {cardAttachments.map((attachment) => (
+                      <span className="card-attachment-item" key={attachment.id}>
+                        <a href={attachment.url} target="_blank" rel="noreferrer">
+                          <svg aria-hidden="true" fill="none" height="13" viewBox="0 0 24 24" width="13">
+                            <path d="m21.4 11.6-8.8 8.8a6 6 0 0 1-8.5-8.5l9.4-9.4a4 4 0 0 1 5.7 5.7L9.7 17.7a2 2 0 1 1-2.8-2.8l8.8-8.8" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                          </svg>
+                          {attachment.name}
+                        </a>
+                        <button type="button" disabled={isSavingDetail} onClick={() => removeCardAttachment(attachment.id)}>
+                          Remove
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
 
@@ -590,7 +926,7 @@ function CardDetailModal({
                 <button
                   className="small-action-button"
                   type="submit"
-                  disabled={!selectedLinkedCard || hasDuplicateLinkedWorkItem}
+                  disabled={!selectedLinkedCard || hasDuplicateLinkedWorkItem || isSavingDetail}
                 >
                   Add linked item
                 </button>
@@ -607,11 +943,8 @@ function CardDetailModal({
                       <button
                         className="small-action-button"
                         type="button"
-                        onClick={() =>
-                          setLinkedWorkItems((currentItems) =>
-                            currentItems.filter((item) => item.id !== linkedItem.id)
-                          )
-                        }
+                        disabled={isSavingDetail}
+                        onClick={() => removeLinkedWorkItem(linkedItem.id)}
                       >
                         Remove
                       </button>
@@ -626,11 +959,14 @@ function CardDetailModal({
             <section className="card-description-section">
               <header>
                 <h3>Description</h3>
-                <button className="small-action-button" type="button">
-                  Edit
-                </button>
               </header>
-              <p>{card.description || "No description yet."}</p>
+              <textarea
+                value={descriptionDraft}
+                rows="5"
+                aria-label="Card description"
+                placeholder="Add a description."
+                onChange={(event) => setDescriptionDraft(event.target.value)}
+              />
             </section>
 
             <section className="card-development-section">

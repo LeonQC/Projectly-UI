@@ -116,7 +116,15 @@ function isSameId(leftId, rightId) {
   return String(leftId) === String(rightId);
 }
 
-function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, workspace }) {
+function ProjectBacklogPage({
+  initialCardId,
+  onArchiveProject,
+  onCloseCardRoute,
+  onOpenCardRoute,
+  onUpdateProject,
+  project,
+  workspace,
+}) {
   const [activeTab, setActiveTab] = useState("Backlog");
   const [expandedEpicId, setExpandedEpicId] = useState(null);
   const [localEpics, setLocalEpics] = useState(project.epics ?? []);
@@ -436,6 +444,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       ]);
       removeCardFromProject(cardId);
       setSelectedCard(null);
+      onCloseCardRoute?.();
     } catch (error) {
       setEpicError(error.message);
     }
@@ -575,6 +584,9 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       setArchivedCards((cards) => cards.filter((card) => !isSameId(card.id, cardId)));
       removeCardFromProject(cardId);
       setSelectedCard((card) => (card?.id === cardId ? null : card));
+      if (isSameId(selectedCard?.id, cardId)) {
+        onCloseCardRoute?.();
+      }
     } catch (error) {
       setEpicError(error.message);
     }
@@ -659,6 +671,32 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       }))
     );
   }
+
+  function openCard(card) {
+    setSelectedCard(card);
+    onOpenCardRoute?.(card.id);
+  }
+
+  function closeCard() {
+    setSelectedCard(null);
+    onCloseCardRoute?.();
+  }
+
+  useEffect(() => {
+    if (!initialCardId) {
+      setSelectedCard(null);
+      return;
+    }
+
+    if (isLoadingEpics) {
+      return;
+    }
+
+    const routeCard = findCardById(initialCardId);
+    if (routeCard && !isSameId(selectedCard?.id, routeCard.id)) {
+      setSelectedCard(routeCard);
+    }
+  }, [createdCards, initialCardId, isLoadingEpics, localEpics, selectedCard?.id]);
 
   function applyCardUpdate(cardId, updates) {
     setCreatedCards((cards) =>
@@ -944,7 +982,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           onArchiveStatus={archiveStatus}
           onCreateStatus={createCustomStatus}
           onEditStatus={editStatus}
-          onOpenCard={setSelectedCard}
+          onOpenCard={openCard}
           onStatusChange={updateCardStatus}
           statuses={statusOptions}
         />
@@ -999,7 +1037,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
             onDropCardToSprint={moveCardToSprint}
             onMoveEpic={reorderVisibleEpics}
             onMoveSprint={moveSprint}
-            onOpenCard={setSelectedCard}
+            onOpenCard={openCard}
             onOpenCreateEpic={() => setIsCreatingEpic(true)}
             onOpenCreateCard={() => setIsCreatingCard(true)}
             onOpenCreateSprint={(epicId) => {
@@ -1257,7 +1295,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
           card={selectedCard}
           linkedWorkItemOptions={linkedWorkItemOptions}
           onArchiveCard={archiveCard}
-          onClose={() => setSelectedCard(null)}
+          onClose={closeCard}
           onCreateStatus={createCustomStatus}
           onStatusChange={updateCardStatus}
           onUpdateCard={updateCardDetails}

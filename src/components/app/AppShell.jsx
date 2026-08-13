@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { matchPath, useLocation, useNavigate } from "react-router-dom";
 import {
   archiveProject as archiveProjectRequest,
   archiveWorkspace as archiveWorkspaceRequest,
@@ -58,7 +59,56 @@ function mapProject(project) {
   };
 }
 
+function getRoutePage(pathname) {
+  const cardMatch = matchPath(
+    "/workspaces/:workspaceId/projects/:projectId/cards/:cardId",
+    pathname
+  );
+  if (cardMatch) {
+    return {
+      name: "project-backlog",
+      workspaceId: Number(cardMatch.params.workspaceId),
+      projectId: Number(cardMatch.params.projectId),
+      cardId: Number(cardMatch.params.cardId),
+    };
+  }
+
+  const projectMatch = matchPath("/workspaces/:workspaceId/projects/:projectId", pathname);
+  if (projectMatch) {
+    return {
+      name: "project-backlog",
+      workspaceId: Number(projectMatch.params.workspaceId),
+      projectId: Number(projectMatch.params.projectId),
+    };
+  }
+
+  const workspaceMatch = matchPath("/workspaces/:workspaceId", pathname);
+  if (workspaceMatch) {
+    return {
+      name: "workspace-projects",
+      workspaceId: Number(workspaceMatch.params.workspaceId),
+      workspaceTab: "projects",
+    };
+  }
+
+  if (pathname === "/inbox") {
+    return { name: "inbox" };
+  }
+
+  if (pathname === "/settings") {
+    return { name: "user-settings" };
+  }
+
+  if (pathname === "/archived-workspace") {
+    return { name: "archived-workspace" };
+  }
+
+  return { name: "all-projects" };
+}
+
 function AppShell({ currentUser, onLogout }) {
+  const location = useLocation();
+  const navigate = useNavigate();
   const sidebarUser = currentUser
     ? {
         ...user,
@@ -70,7 +120,7 @@ function AppShell({ currentUser, onLogout }) {
       }
     : user;
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
-  const [activePage, setActivePage] = useState({ name: "all-projects" });
+  const [activePage, setActivePage] = useState(() => getRoutePage(window.location.pathname));
   const [archivedProjects, setArchivedProjects] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
   const [archivedWorkspaces, setArchivedWorkspaces] = useState([]);
@@ -94,6 +144,13 @@ function AppShell({ currentUser, onLogout }) {
   const activeWorkspaceArchivedProjects = archivedProjects.filter(
     (project) => project.workspace_id === activeWorkspace?.id
   );
+
+  useEffect(() => {
+    setActivePage((currentPage) => ({
+      ...currentPage,
+      ...getRoutePage(location.pathname),
+    }));
+  }, [location.pathname]);
 
   useEffect(() => {
     let isMounted = true;
@@ -163,6 +220,7 @@ function AppShell({ currentUser, onLogout }) {
         )
       );
       setArchivedProjects((currentProjects) => [{ ...project, archived: true }, ...currentProjects]);
+      navigate(`/workspaces/${projectWorkspace.id}`);
       setActivePage({
         name: "workspace-projects",
         workspaceId: projectWorkspace.id,
@@ -187,6 +245,7 @@ function AppShell({ currentUser, onLogout }) {
             : workspace
         )
       );
+      navigate(`/workspaces/${project.workspace_id}`);
       setActivePage({
         name: "workspace-projects",
         workspaceId: project.workspace_id,
@@ -212,6 +271,7 @@ function AppShell({ currentUser, onLogout }) {
       );
 
       if (activePage.projectId === projectId) {
+        navigate("/archived-workspace");
         setActivePage({ name: "archived-workspace" });
       }
     } catch (error) {
@@ -220,22 +280,27 @@ function AppShell({ currentUser, onLogout }) {
   }
 
   function openAllProjects() {
+    navigate("/");
     setActivePage({ name: "all-projects" });
   }
 
   function openArchivedProjects() {
+    navigate("/archived-workspace");
     setActivePage({ name: "archived-workspace" });
   }
 
   function openInbox() {
+    navigate("/inbox");
     setActivePage({ name: "inbox" });
   }
 
   function openUserSettings() {
+    navigate("/settings");
     setActivePage({ name: "user-settings" });
   }
 
   function openWorkspaceProjects(workspaceId, workspaceTab = "projects", options = {}) {
+    navigate(`/workspaces/${workspaceId}`);
     setActivePage({
       name: "workspace-projects",
       workspaceId,
@@ -277,6 +342,7 @@ function AppShell({ currentUser, onLogout }) {
         projectId,
         workspaceId: project.workspace_id,
       });
+      navigate(`/workspaces/${project.workspace_id}/projects/${projectId}`);
     } catch (error) {
       setWorkspaceError(error.message);
       if (projectWorkspace) {
@@ -285,6 +351,7 @@ function AppShell({ currentUser, onLogout }) {
           projectId,
           workspaceId: projectWorkspace.id,
         });
+        navigate(`/workspaces/${projectWorkspace.id}/projects/${projectId}`);
       }
     }
   }
@@ -337,6 +404,7 @@ function AppShell({ currentUser, onLogout }) {
       const workspace = mapWorkspace(await createWorkspaceRequest(workspaceInput));
       setWorkspaces((currentWorkspaces) => [...currentWorkspaces, workspace]);
 
+      navigate(`/workspaces/${workspace.id}`);
       setActivePage({
         name: "workspace-projects",
         workspaceId: workspace.id,
@@ -379,6 +447,7 @@ function AppShell({ currentUser, onLogout }) {
         { ...workspace, archived: true, projects: [] },
         ...currentWorkspaces,
       ]);
+      navigate("/archived-workspace");
       setActivePage({ name: "archived-workspace" });
     } catch (error) {
       setWorkspaceError(error.message);
@@ -393,6 +462,7 @@ function AppShell({ currentUser, onLogout }) {
         currentWorkspaces.filter((currentWorkspace) => currentWorkspace.id !== workspaceId)
       );
       setWorkspaces((currentWorkspaces) => [...currentWorkspaces, workspace]);
+      navigate(`/workspaces/${workspace.id}`);
       setActivePage({ name: "workspace-projects", workspaceId: workspace.id, workspaceTab: "projects" });
     } catch (error) {
       setWorkspaceError(error.message);
@@ -479,7 +549,12 @@ function AppShell({ currentUser, onLogout }) {
         </section>
       ) : activePage.name === "project-backlog" && activeProject && activeProjectWorkspace ? (
         <ProjectBacklogPage
+          initialCardId={activePage.cardId}
           onArchiveProject={archiveProject}
+          onCloseCardRoute={() => navigate(`/workspaces/${activeProjectWorkspace.id}/projects/${activeProject.id}`)}
+          onOpenCardRoute={(cardId) =>
+            navigate(`/workspaces/${activeProjectWorkspace.id}/projects/${activeProject.id}/cards/${cardId}`)
+          }
           onUpdateProject={updateProject}
           project={activeProject}
           workspace={activeProjectWorkspace}

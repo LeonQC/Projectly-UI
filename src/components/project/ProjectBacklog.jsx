@@ -71,12 +71,12 @@ function EpicSprint({
                 <span title="Done">{sprintStatusCounts.done}</span>
               </div>
               <button
-                className="start-sprint-button"
+                className={`start-sprint-button ${sprint.isStarted ? "is-active" : ""}`}
                 type="button"
                 onClick={() => onStartSprint(epic.id)}
                 disabled={sprintStartDisabled}
               >
-                {sprint.isStarted ? "Started" : "Start sprint"}
+                {sprint.isStarted ? "Cancel sprint" : "Start sprint"}
               </button>
               <div className="sprint-menu-wrapper" ref={sprintMenuRef}>
                 <button

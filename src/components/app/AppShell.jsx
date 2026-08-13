@@ -146,10 +146,7 @@ function AppShell({ currentUser, onLogout }) {
   );
 
   useEffect(() => {
-    setActivePage((currentPage) => ({
-      ...currentPage,
-      ...getRoutePage(location.pathname),
-    }));
+    setActivePage(getRoutePage(location.pathname));
   }, [location.pathname]);
 
   useEffect(() => {

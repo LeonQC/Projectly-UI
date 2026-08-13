@@ -222,22 +222,29 @@ function ProjectBacklogPage({
     incomplete: epics.length - completedEpics,
   };
   const sprintIsComplete =
-    allSprintCards.length > 0 && allSprintCards.every((card) => card.completed || card.status === "done");
+    startedSprintCards.length > 0 && startedSprintCards.every((card) => card.completed || card.status === "done");
   const sprintStats = {
     completed: sprintIsComplete ? 1 : 0,
-    incomplete: allSprintCards.length > 0 && !sprintIsComplete ? 1 : 0,
+    incomplete: startedSprintCards.length > 0 && !sprintIsComplete ? 1 : 0,
   };
   const sprintStartDisabled =
-    !sprint || sprint.isStarted || sprintCards.length === 0 || !sprint.startDate || !sprint.endDate;
+    !sprint || (!sprint.isStarted && (sprintCards.length === 0 || !sprint.startDate || !sprint.endDate));
   const sprintOptions = epics.flatMap((epic) =>
     (epic.sprints ?? [])
       .filter((epicSprint) => !epicSprint.archived)
       .map((epicSprint) => ({
         id: epicSprint.id,
+        epicId: epic.id,
         title: epicSprint.title,
         epicName: epic.name,
       }))
   );
+  const epicOptions = epics
+    .filter((epic) => !epic.archived)
+    .map((epic) => ({
+      id: epic.id,
+      title: epic.name,
+    }));
 
   useEffect(() => {
     let isMounted = true;
@@ -740,6 +747,9 @@ function ProjectBacklogPage({
     if ("status" in updates) {
       payload.status = toApiCardStatus(updates.status);
     }
+    if ("epicId" in updates) {
+      payload.epic_id = updates.epicId ?? null;
+    }
 
     setEpicError("");
     try {
@@ -1054,10 +1064,8 @@ function ProjectBacklogPage({
               const selectedSprintCards = selectedSprint?.cards ?? [];
               const selectedSprintStartDisabled =
                 !selectedSprint ||
-                selectedSprint.isStarted ||
-                selectedSprintCards.length === 0 ||
-                !selectedSprint.startDate ||
-                !selectedSprint.endDate;
+                (!selectedSprint.isStarted &&
+                  (selectedSprintCards.length === 0 || !selectedSprint.startDate || !selectedSprint.endDate));
 
               if (selectedSprintStartDisabled) {
                 return;
@@ -1065,7 +1073,8 @@ function ProjectBacklogPage({
 
               setEpicError("");
               try {
-                const sprint = mapSprint(await updateSprintRequest(selectedSprint.id, { status: "active" }));
+                const nextStatus = selectedSprint.isStarted ? "planned" : "active";
+                const sprint = mapSprint(await updateSprintRequest(selectedSprint.id, { status: nextStatus }));
                 setLocalEpics((currentEpics) =>
                   currentEpics.map((epic) =>
                     epic.id === epicId
@@ -1080,7 +1089,9 @@ function ProjectBacklogPage({
                       : epic
                   )
                 );
-                setActiveTab("Board");
+                if (nextStatus === "active") {
+                  setActiveTab("Board");
+                }
               } catch (error) {
                 setEpicError(error.message);
               }
@@ -1103,10 +1114,8 @@ function ProjectBacklogPage({
               const epicSprintCards = epicSprint?.cards ?? [];
               return (
                 !epicSprint ||
-                epicSprint.isStarted ||
-                epicSprintCards.length === 0 ||
-                !epicSprint.startDate ||
-                !epicSprint.endDate
+                (!epicSprint.isStarted &&
+                  (epicSprintCards.length === 0 || !epicSprint.startDate || !epicSprint.endDate))
               );
             }}
             getSprintStatusCounts={(epic) => {
@@ -1299,6 +1308,7 @@ function ProjectBacklogPage({
           onCreateStatus={createCustomStatus}
           onStatusChange={updateCardStatus}
           onUpdateCard={updateCardDetails}
+          epicOptions={epicOptions}
           projectMembers={projectMembers}
           sprintOptions={sprintOptions}
           statuses={statusOptions}

@@ -1,15 +1,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import {
   createCardAttachment,
+  createCardComment,
   createCardLabel,
   createCardLink,
   createCardMember,
   deleteCardAttachment,
+  deleteCardComment,
   deleteCardLabel,
   deleteCardLink,
   deleteCardMember,
   getCardDetail,
+  listCommentMentionUsers,
   listProjectMembers,
+  updateCardComment,
 } from "../../lib/api.js";
 
 const defaultCardStatuses = [
@@ -70,12 +74,14 @@ function fromApiCardStatus(status) {
 
 function mapUser(user) {
   const name = user?.username || user?.email || `User ${user?.id ?? ""}`.trim();
+  const username = user?.username ? user.username.replace(/\s+/g, "") : `user-${user?.id ?? "unknown"}`;
 
   return {
     id: user?.id,
+    email: user?.email ?? "",
     initials: getInitials(name),
     name,
-    username: user?.email ? `@${user.email.split("@")[0]}` : `@user-${user?.id ?? "unknown"}`,
+    username: `@${username}`,
   };
 }
 
@@ -149,6 +155,7 @@ function CardDetailModal({
   onCreateStatus,
   onStatusChange,
   onUpdateCard,
+  epicOptions = [],
   projectMembers = [],
   sprintOptions = [],
   statuses = defaultCardStatuses,
@@ -161,7 +168,9 @@ function CardDetailModal({
   const [isSavingDetail, setIsSavingDetail] = useState(false);
   const [titleDraft, setTitleDraft] = useState(card.title ?? "");
   const [descriptionDraft, setDescriptionDraft] = useState(card.description ?? "");
-  const [sprintId, setSprintId] = useState(card.sprintId ?? "backlog");
+  const initialSprintOption = sprintOptions.find((option) => String(option.id) === String(card.sprintId));
+  const [epicId, setEpicId] = useState(card.epicId ?? initialSprintOption?.epicId ?? "backlog");
+  const [sprintId, setSprintId] = useState(card.sprintId ?? "");
   const [linkedRelation, setLinkedRelation] = useState(workItemRelations[0]);
   const [linkedCardId, setLinkedCardId] = useState("");
   const [linkedWorkItems, setLinkedWorkItems] = useState([]);
@@ -169,6 +178,7 @@ function CardDetailModal({
   const [isStatusModalOpen, setIsStatusModalOpen] = useState(false);
   const [newStatusTitle, setNewStatusTitle] = useState("");
   const [memberSearch, setMemberSearch] = useState("");
+  const [isMemberPickerOpen, setIsMemberPickerOpen] = useState(false);
   const [projectAccessMembers, setProjectAccessMembers] = useState(projectMembers);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [memberPendingRemoveId, setMemberPendingRemoveId] = useState(null);
@@ -183,8 +193,10 @@ function CardDetailModal({
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState("");
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
+  const [mentionUsers, setMentionUsers] = useState([]);
   const cardMenuRef = useRef(null);
   const statusMenuRef = useRef(null);
+  const memberPickerRef = useRef(null);
   const memberRemoveRef = useRef(null);
   const labelRemoveRef = useRef(null);
   const commentInputRef = useRef(null);
@@ -192,10 +204,25 @@ function CardDetailModal({
   const attachmentInputRef = useRef(null);
   const cardAttachmentInputRef = useRef(null);
   const displayCard = detailCard ?? card;
+  const selectedEpicSprints =
+    epicId === "backlog"
+      ? []
+      : sprintOptions.filter((option) => String(option.epicId) === String(epicId));
+  const normalizedMemberSearch = memberSearch.trim().replace(/^@/, "").toLowerCase();
   const filteredMembers = projectAccessMembers.filter((member) => {
-    const searchValue = `${member.name} ${member.username}`.toLowerCase();
+    const searchValue = [
+      member.name,
+      member.username,
+      member.username?.replace(/^@/, ""),
+      member.email,
+      member.role,
+      member.membershipType,
+    ]
+      .filter(Boolean)
+      .join(" ")
+      .toLowerCase();
     return (
-      searchValue.includes(memberSearch.toLowerCase()) &&
+      searchValue.includes(normalizedMemberSearch) &&
       !selectedMembers.some((selectedMember) => String(selectedMember.id) === String(member.id))
     );
   });
@@ -208,7 +235,7 @@ function CardDetailModal({
   const mentionMatch = commentText.match(/(?:^|\s)@([\w-]*)$/);
   const mentionSearch = mentionMatch?.[1].toLowerCase() ?? "";
   const mentionOptions = isMentionMenuOpen && mentionMatch
-    ? projectAccessMembers.filter((member) => {
+    ? mentionUsers.filter((member) => {
         const username = member.username.replace(/^@/, "").toLowerCase();
         return username.includes(mentionSearch) || member.name.toLowerCase().includes(mentionSearch);
       })
@@ -259,6 +286,8 @@ function CardDetailModal({
     try {
       const cardMember = await createCardMember(card.id, member.id);
       setSelectedMembers((members) => [...members, mapDetailMember(cardMember)]);
+      setMemberSearch("");
+      setIsMemberPickerOpen(false);
     } catch (error) {
       setDetailError(error.message);
     } finally {
@@ -355,6 +384,8 @@ function CardDetailModal({
         id: `attachment-${file.name}-${file.lastModified}-${Date.now()}`,
         name: file.name,
         size: file.size,
+        type: file.type || null,
+        url: URL.createObjectURL(file),
       })),
     ]);
     event.target.value = "";
@@ -457,28 +488,34 @@ function CardDetailModal({
     window.requestAnimationFrame(() => commentInputRef.current?.focus());
   }
 
-  function publishComment(event) {
+  async function publishComment(event) {
     event.preventDefault();
 
     const trimmedComment = commentText.trim();
 
-    if (!trimmedComment && commentAttachments.length === 0) {
+    if (!trimmedComment) {
       return;
     }
 
-    setComments((currentComments) => [
-      {
-        id: `comment-${Date.now()}`,
-        author: currentUser,
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      const comment = await createCardComment(card.id, {
         body: trimmedComment,
         attachments: commentAttachments,
-        createdAt: "Just now",
-      },
-      ...currentComments,
-    ]);
-    setCommentText("");
-    setCommentAttachments([]);
-    setIsMentionMenuOpen(false);
+      });
+      setComments((currentComments) => [
+        mapDetailComment(comment, projectAccessMembers),
+        ...currentComments,
+      ]);
+      setCommentText("");
+      setCommentAttachments([]);
+      setIsMentionMenuOpen(false);
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
   }
 
   function startEditingComment(comment) {
@@ -491,25 +528,45 @@ function CardDetailModal({
     setEditingCommentText("");
   }
 
-  function saveEditedComment(comment) {
+  async function saveEditedComment(comment) {
     const trimmedComment = editingCommentText.trim();
 
-    if (!trimmedComment && comment.attachments.length === 0) {
+    if (!trimmedComment) {
       return;
     }
 
-    setComments((currentComments) =>
-      currentComments.map((currentComment) =>
-        currentComment.id === comment.id
-          ? {
-              ...currentComment,
-              body: trimmedComment,
-              editedAt: "Edited just now",
-            }
-          : currentComment
-      )
-    );
-    cancelEditingComment();
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      const updatedComment = await updateCardComment(comment.id, { body: trimmedComment });
+      setComments((currentComments) =>
+        currentComments.map((currentComment) =>
+          currentComment.id === comment.id
+            ? mapDetailComment(updatedComment, projectAccessMembers)
+            : currentComment
+        )
+      );
+      cancelEditingComment();
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
+  }
+
+  async function removeComment(commentId) {
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      await deleteCardComment(commentId);
+      setComments((currentComments) =>
+        currentComments.filter((comment) => String(comment.id) !== String(commentId))
+      );
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
   }
 
   function saveCardDetails() {
@@ -521,8 +578,9 @@ function CardDetailModal({
 
     onUpdateCard?.(card.id, {
       description: descriptionDraft.trim(),
+      epicId: epicId === "backlog" ? null : epicId,
       title: trimmedTitle,
-      sprintId: sprintId === "backlog" ? null : sprintId,
+      sprintId: sprintId || null,
     });
     onClose();
   }
@@ -536,12 +594,15 @@ function CardDetailModal({
       setDetailCard(card);
       setTitleDraft(card.title ?? "");
       setDescriptionDraft(card.description ?? "");
-      setSprintId(card.sprintId ?? "backlog");
+      const cardSprintOption = sprintOptions.find((option) => String(option.id) === String(card.sprintId));
+      setEpicId(card.epicId ?? cardSprintOption?.epicId ?? "backlog");
+      setSprintId(card.sprintId ?? "");
       setLabels([]);
       setSelectedMembers([]);
       setCardAttachments([]);
       setComments([]);
       setLinkedWorkItems([]);
+      setMentionUsers([]);
 
       try {
         const detail = await getCardDetail(card.id);
@@ -559,17 +620,24 @@ function CardDetailModal({
           epicId: detail.card.epic_id ?? card.epicId ?? null,
           epic_id: detail.card.epic_id ?? card.epicId ?? null,
         };
-        const projectMemberData = await listProjectMembers(nextCard.project_id);
+        const [projectMemberData, mentionUserData] = await Promise.all([
+          listProjectMembers(nextCard.project_id),
+          listCommentMentionUsers(card.id),
+        ]);
+        const mappedProjectMembers = (projectMemberData ?? []).map(mapProjectMember);
 
         setDetailCard(nextCard);
         setTitleDraft(nextCard.title ?? "");
         setDescriptionDraft(nextCard.description ?? "");
-        setSprintId(nextCard.sprintId ?? "backlog");
-        setProjectAccessMembers((projectMemberData ?? []).map(mapProjectMember));
+        const nextSprintOption = sprintOptions.find((option) => String(option.id) === String(nextCard.sprintId));
+        setEpicId(nextCard.epicId ?? nextSprintOption?.epicId ?? "backlog");
+        setSprintId(nextCard.sprintId ?? "");
+        setProjectAccessMembers(mappedProjectMembers);
+        setMentionUsers((mentionUserData ?? []).map(mapUser));
         setLabels((detail.labels ?? []).map(mapDetailLabel));
         setSelectedMembers((detail.members ?? []).map(mapDetailMember));
         setCardAttachments((detail.attachments ?? []).map(mapDetailAttachment));
-        setComments((detail.comments ?? []).map((comment) => mapDetailComment(comment, (projectMemberData ?? []).map(mapProjectMember))));
+        setComments((detail.comments ?? []).map((comment) => mapDetailComment(comment, mappedProjectMembers)));
         setLinkedWorkItems((detail.links ?? []).map((link) => mapDetailLink(link, card.id)));
       } catch (error) {
         if (isMounted) {
@@ -601,6 +669,10 @@ function CardDetailModal({
 
       if (memberRemoveRef.current && !memberRemoveRef.current.contains(event.target)) {
         setMemberPendingRemoveId(null);
+      }
+
+      if (memberPickerRef.current && !memberPickerRef.current.contains(event.target)) {
+        setIsMemberPickerOpen(false);
       }
 
       if (labelRemoveRef.current && !labelRemoveRef.current.contains(event.target)) {
@@ -669,17 +741,43 @@ function CardDetailModal({
             </div>
 
             <label className="card-status-field">
+              <span>Epic</span>
+              <span className="card-select-wrapper">
+                <select
+                  className="card-status-select"
+                  value={epicId}
+                  onChange={(event) => {
+                    const nextEpicId = event.target.value;
+                    setEpicId(nextEpicId);
+                    setSprintId("");
+                  }}
+                >
+                  <option value="backlog">Backlog</option>
+                  {epicOptions.map((option) => (
+                    <option value={option.id} key={option.id}>
+                      {option.title}
+                    </option>
+                  ))}
+                </select>
+                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                  <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                </svg>
+              </span>
+            </label>
+
+            <label className="card-status-field">
               <span>Sprint</span>
               <span className="card-select-wrapper">
                 <select
                   className="card-status-select"
                   value={sprintId}
                   onChange={(event) => setSprintId(event.target.value)}
+                  disabled={epicId === "backlog"}
                 >
-                  <option value="backlog">Backlog</option>
-                  {sprintOptions.map((option) => (
+                  <option value="">No sprint</option>
+                  {selectedEpicSprints.map((option) => (
                     <option value={option.id} key={option.id}>
-                      {option.title} ({option.epicName})
+                      {option.title}
                     </option>
                   ))}
                 </select>
@@ -756,55 +854,64 @@ function CardDetailModal({
             <div className="card-tab-panel">
               {activeTab === "Members" ? (
                 <div className="card-member-editor">
-                  <input
-                    type="search"
-                    placeholder="Search project members"
-                    value={memberSearch}
-                    onChange={(event) => setMemberSearch(event.target.value)}
-                  />
-                  <div className="selected-member-list">
-                    {selectedMembers.length > 0 ? (
-                      selectedMembers.map((member) => (
-                        <span
-                          className="selected-member-chip"
-                          key={member.id}
-                          ref={memberPendingRemoveId === member.id ? memberRemoveRef : null}
-                          onContextMenu={(event) => {
-                            event.preventDefault();
-                            setMemberPendingRemoveId(member.id);
-                          }}
-                        >
+                  <div className="member-picker" ref={memberPickerRef}>
+                    <input
+                      type="search"
+                      placeholder="Search project members"
+                      value={memberSearch}
+                      onFocus={() => setIsMemberPickerOpen(true)}
+                      onChange={(event) => {
+                        setMemberSearch(event.target.value);
+                        setIsMemberPickerOpen(true);
+                      }}
+                    />
+                    {isMemberPickerOpen && (
+                      <div className="member-search-dropdown" role="listbox" aria-label="Project members">
+                        {filteredMembers.map((member) => (
                           <button
-                            className="selected-member-avatar-button"
                             type="button"
-                            aria-label={member.name}
+                            disabled={isSavingDetail}
+                            onClick={() => addMember(member)}
+                            key={member.id}
                           >
                             <span className="member-avatar">{member.initials}</span>
+                            <span>{member.name}</span>
+                            <small>{member.email || member.username}</small>
                           </button>
-                          {member.name}
-                          {memberPendingRemoveId === member.id && (
-                            <span className="chip-remove-dropdown">
-                              <button
-                                type="button"
-                                onClick={() => removeMember(member.id)}
-                              >
-                                Remove
-                              </button>
-                            </span>
-                          )}
-                        </span>
-                      ))
-                    ) : (
-                      <p className="empty-state">No members assigned.</p>
+                        ))}
+                      </div>
                     )}
                   </div>
-                  <div className="member-search-results">
-                    {filteredMembers.map((member) => (
-                      <button type="button" disabled={isSavingDetail} onClick={() => addMember(member)} key={member.id}>
-                        <span className="member-avatar">{member.initials}</span>
-                        <span>{member.name}</span>
-                        <small>{member.username}</small>
-                      </button>
+                  <div className="selected-member-list">
+                    {selectedMembers.map((member) => (
+                      <span
+                        className="selected-member-chip"
+                        key={member.id}
+                        ref={memberPendingRemoveId === member.id ? memberRemoveRef : null}
+                        onContextMenu={(event) => {
+                          event.preventDefault();
+                          setMemberPendingRemoveId(member.id);
+                        }}
+                      >
+                        <button
+                          className="selected-member-avatar-button"
+                          type="button"
+                          aria-label={member.name}
+                        >
+                          <span className="member-avatar">{member.initials}</span>
+                        </button>
+                        {member.name}
+                        {memberPendingRemoveId === member.id && (
+                          <span className="chip-remove-dropdown">
+                            <button
+                              type="button"
+                              onClick={() => removeMember(member.id)}
+                            >
+                              Remove
+                            </button>
+                          </span>
+                        )}
+                      </span>
                     ))}
                   </div>
                 </div>
@@ -1049,6 +1156,7 @@ function CardDetailModal({
                     <button
                       className="small-action-button"
                       type="button"
+                      disabled={isSavingDetail}
                       onClick={openMentionMenu}
                     >
                       @user
@@ -1063,6 +1171,7 @@ function CardDetailModal({
                     <button
                       className="small-action-button"
                       type="button"
+                      disabled={isSavingDetail}
                       onClick={() => attachmentInputRef.current?.click()}
                     >
                       <svg aria-hidden="true" fill="none" height="15" viewBox="0 0 24 24" width="15">
@@ -1074,7 +1183,7 @@ function CardDetailModal({
                   <button
                     className="modal-update-button"
                     type="submit"
-                    disabled={!commentText.trim() && commentAttachments.length === 0}
+                    disabled={isSavingDetail || !commentText.trim()}
                   >
                     Comment
                   </button>
@@ -1094,13 +1203,24 @@ function CardDetailModal({
                             {comment.editedAt && <span>{comment.editedAt}</span>}
                           </div>
                           {editingCommentId !== comment.id && (
-                            <button
-                              className="comment-edit-button"
-                              type="button"
-                              onClick={() => startEditingComment(comment)}
-                            >
-                              Edit
-                            </button>
+                            <div className="comment-header-actions">
+                              <button
+                                className="comment-edit-button"
+                                type="button"
+                                disabled={isSavingDetail}
+                                onClick={() => startEditingComment(comment)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="comment-edit-button"
+                                type="button"
+                                disabled={isSavingDetail}
+                                onClick={() => removeComment(comment.id)}
+                              >
+                                Delete
+                              </button>
+                            </div>
                           )}
                         </header>
                         {editingCommentId === comment.id ? (
@@ -1122,7 +1242,7 @@ function CardDetailModal({
                               <button
                                 className="modal-update-button"
                                 type="button"
-                                disabled={!editingCommentText.trim() && comment.attachments.length === 0}
+                                disabled={isSavingDetail || !editingCommentText.trim()}
                                 onClick={() => saveEditedComment(comment)}
                               >
                                 Save

@@ -303,6 +303,41 @@ export async function getCardDetail(cardId) {
   return payload.data;
 }
 
+export async function listCommentMentionUsers(cardId) {
+  const payload = await apiFetch(`/cards/${cardId}/comments/mention-users`);
+  return payload.data;
+}
+
+export async function createCardComment(cardId, { attachments = [], body }) {
+  const payload = await apiFetch(`/cards/${cardId}/comments`, {
+    method: "POST",
+    body: JSON.stringify({
+      body,
+      attachments: attachments.map((attachment) => ({
+        file_name: attachment.name,
+        file_url: attachment.url,
+        file_type: attachment.type || null,
+        file_size: attachment.size ?? null,
+      })),
+    }),
+  });
+  return payload.data;
+}
+
+export async function updateCardComment(commentId, { body }) {
+  const payload = await apiFetch(`/comments/${commentId}`, {
+    method: "PATCH",
+    body: JSON.stringify({ body }),
+  });
+  return payload.data;
+}
+
+export async function deleteCardComment(commentId) {
+  return apiFetch(`/comments/${commentId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function createCardLabel(cardId, { color, name }) {
   const payload = await apiFetch(`/cards/${cardId}/labels`, {
     method: "POST",

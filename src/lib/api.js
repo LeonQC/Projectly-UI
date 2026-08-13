@@ -143,6 +143,11 @@ export async function getProject(projectId) {
   return payload.data;
 }
 
+export async function listProjectMembers(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}/members`);
+  return payload.data;
+}
+
 export async function updateProject(projectId, updates) {
   const payload = await apiFetch(`/projects/${projectId}`, {
     method: "PATCH",
@@ -291,6 +296,78 @@ export async function createCard(projectId, { description, epicId, position = 0,
 export async function getCard(cardId) {
   const payload = await apiFetch(`/cards/${cardId}`);
   return payload.data;
+}
+
+export async function getCardDetail(cardId) {
+  const payload = await apiFetch(`/cards/${cardId}/detail`);
+  return payload.data;
+}
+
+export async function createCardLabel(cardId, { color, name }) {
+  const payload = await apiFetch(`/cards/${cardId}/labels`, {
+    method: "POST",
+    body: JSON.stringify({
+      name,
+      color,
+    }),
+  });
+  return payload.data;
+}
+
+export async function deleteCardLabel(labelId) {
+  return apiFetch(`/card-labels/${labelId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function createCardMember(cardId, userId) {
+  const payload = await apiFetch(`/cards/${cardId}/members`, {
+    method: "POST",
+    body: JSON.stringify({ user_id: userId }),
+  });
+  return payload.data;
+}
+
+export async function deleteCardMember(memberId) {
+  return apiFetch(`/card-members/${memberId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function createCardAttachment(cardId, { fileName, fileSize, fileType, fileUrl }) {
+  const payload = await apiFetch(`/cards/${cardId}/attachments`, {
+    method: "POST",
+    body: JSON.stringify({
+      file_name: fileName,
+      file_url: fileUrl,
+      file_type: fileType || null,
+      file_size: fileSize ?? null,
+    }),
+  });
+  return payload.data;
+}
+
+export async function deleteCardAttachment(attachmentId) {
+  return apiFetch(`/attachments/${attachmentId}`, {
+    method: "DELETE",
+  });
+}
+
+export async function createCardLink(cardId, { relationship, targetCardId }) {
+  const payload = await apiFetch(`/cards/${cardId}/links`, {
+    method: "POST",
+    body: JSON.stringify({
+      relationship,
+      target_card_id: targetCardId,
+    }),
+  });
+  return payload.data;
+}
+
+export async function deleteCardLink(linkId) {
+  return apiFetch(`/card-links/${linkId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function updateCard(cardId, updates) {

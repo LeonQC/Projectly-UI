@@ -12,16 +12,24 @@ import ProjectSummary from "../../components/project/ProjectSummary.jsx";
 import ProjectTabs from "../../components/project/ProjectTabs.jsx";
 import SprintEditModal from "../../components/project/SprintEditModal.jsx";
 import {
+  archiveCard as archiveCardRequest,
   archiveEpic as archiveEpicRequest,
   archiveSprint as archiveSprintRequest,
+  createCard as createCardRequest,
   createEpic as createEpicRequest,
   createSprint as createSprintRequest,
   listEpicSprints,
+  listArchivedProjectCards,
+  listProjectCards,
   listProjectEpics,
+  moveCard as moveCardRequest,
+  permanentlyDeleteCard as permanentlyDeleteCardRequest,
   permanentlyDeleteEpic as permanentlyDeleteEpicRequest,
   permanentlyDeleteSprint as permanentlyDeleteSprintRequest,
+  restoreCard as restoreCardRequest,
   restoreEpic as restoreEpicRequest,
   restoreSprint as restoreSprintRequest,
+  updateCard as updateCardRequest,
   updateSprint as updateSprintRequest,
   updateEpic as updateEpicRequest,
 } from "../../lib/api.js";
@@ -68,6 +76,46 @@ function mapSprint(sprint) {
   };
 }
 
+function toApiCardStatus(status) {
+  if (status === "in-progress") {
+    return "in_progress";
+  }
+
+  return status;
+}
+
+function fromApiCardStatus(status) {
+  if (status === "in_progress") {
+    return "in-progress";
+  }
+
+  return status ?? "todo";
+}
+
+function mapCard(card) {
+  const status = fromApiCardStatus(card.status);
+
+  return {
+    ...card,
+    id: card.id,
+    projectId: card.project_id ?? card.projectId,
+    project_id: card.project_id ?? card.projectId,
+    epicId: card.epic_id ?? card.epicId ?? null,
+    epic_id: card.epic_id ?? card.epicId ?? null,
+    sprintId: card.sprint_id ?? card.sprintId ?? null,
+    sprint_id: card.sprint_id ?? card.sprintId ?? null,
+    title: card.title,
+    description: card.description ?? "",
+    completed: status === "done",
+    listName: formatStatusLabel(status),
+    status,
+  };
+}
+
+function isSameId(leftId, rightId) {
+  return String(leftId) === String(rightId);
+}
+
 function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, workspace }) {
   const [activeTab, setActiveTab] = useState("Backlog");
   const [expandedEpicId, setExpandedEpicId] = useState(null);
@@ -90,6 +138,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   const [moveOpenWorkTo, setMoveOpenWorkTo] = useState("SCRUM Sprint 1");
   const [sprintGoal, setSprintGoal] = useState("");
   const [createdCards, setCreatedCards] = useState([]);
+  const [archivedCards, setArchivedCards] = useState([]);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
   const [projectStatuses, setProjectStatuses] = useState(cardStatuses);
@@ -106,24 +155,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
         epicName: epic.name,
       }))
   );
-  const archivedCards = [
-    ...createdCards.filter((card) => card.archived).map((card) => ({
-      ...card,
-      source: "Backlog",
-    })),
-    ...localEpics.flatMap((epic) => [
-      ...epic.cards.filter((card) => card.archived).map((card) => ({
-        ...card,
-        source: epic.name,
-      })),
-      ...(epic.sprints ?? []).flatMap((epicSprint) =>
-        epicSprint.cards.filter((card) => card.archived).map((card) => ({
-          ...card,
-          source: `${epic.name} · ${epicSprint.title}`,
-        }))
-      ),
-    ]),
-  ];
+  const archivedCardItems = archivedCards;
   const activeEpic = epics.find((epic) => epic.id === activeSprintEpicId) ?? null;
   const sprint = activeEpic?.sprints?.find((epicSprint) => !epicSprint.archived) ?? null;
   const editingEpic = localEpics.find((epic) => epic.id === editingEpicId) ?? null;
@@ -214,8 +246,41 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
             sprints: (await listEpicSprints(epic.id)).map(mapSprint),
           }))
         );
+        const cardData = (await listProjectCards(project.id)).map(mapCard);
+        const archivedCardData = (await listArchivedProjectCards(project.id))
+          .map(mapCard)
+          .map((card) => {
+            const sprintSource = epicsWithSprints
+              .flatMap((epic) =>
+                (epic.sprints ?? []).map((sprint) => ({
+                  sprintId: sprint.id,
+                  source: `${epic.name} · ${sprint.title}`,
+                }))
+              )
+              .find((sprint) => isSameId(sprint.sprintId, card.sprintId))?.source;
+
+            return {
+              ...card,
+              originalEpicId: card.epicId,
+              originalSprintId: card.sprintId,
+              originalStatus: card.status,
+              source: sprintSource ?? "Backlog",
+            };
+          });
+        const activeCardData = cardData.filter((card) => !card.archived);
+        const backlogCards = activeCardData.filter((card) => !card.sprintId);
+        const epicsWithCards = epicsWithSprints.map((epic) => ({
+          ...epic,
+          cards: [],
+          sprints: (epic.sprints ?? []).map((sprint) => ({
+            ...sprint,
+            cards: activeCardData.filter((card) => isSameId(card.sprintId, sprint.id)),
+          })),
+        }));
         if (isMounted) {
-          setLocalEpics(epicsWithSprints);
+          setCreatedCards(backlogCards);
+          setArchivedCards(archivedCardData);
+          setLocalEpics(epicsWithCards);
         }
       } catch (error) {
         if (isMounted) {
@@ -335,21 +400,45 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     }
   }
 
-  function archiveCard(cardId) {
-    setCreatedCards((cards) =>
-      cards.map((card) => (card.id === cardId ? { ...card, archived: true } : card))
-    );
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => ({
-        ...epic,
-        cards: epic.cards.map((card) => (card.id === cardId ? { ...card, archived: true } : card)),
-        sprints: (epic.sprints ?? []).map((epicSprint) => ({
-          ...epicSprint,
-          cards: epicSprint.cards.map((card) => (card.id === cardId ? { ...card, archived: true } : card)),
-        })),
-      }))
-    );
-    setSelectedCard(null);
+  async function archiveCard(cardId) {
+    const card = findCardById(cardId);
+    const source =
+      createdCards.some((backlogCard) => isSameId(backlogCard.id, cardId))
+        ? "Backlog"
+        : localEpics.find((epic) => epic.cards.some((epicCard) => isSameId(epicCard.id, cardId)))?.name ??
+          localEpics
+            .flatMap((epic) =>
+              (epic.sprints ?? []).map((epicSprint) => ({
+                source: `${epic.name} · ${epicSprint.title}`,
+                cards: epicSprint.cards,
+              }))
+            )
+            .find((sprint) => sprint.cards.some((sprintCard) => isSameId(sprintCard.id, cardId)))?.source ??
+          "Backlog";
+
+    if (!card) {
+      return;
+    }
+
+    setEpicError("");
+    try {
+      await archiveCardRequest(cardId);
+      setArchivedCards((cards) => [
+        {
+          ...card,
+          archived: true,
+          originalEpicId: card.epicId,
+          originalSprintId: card.sprintId,
+          originalStatus: card.status,
+          source,
+        },
+        ...cards.filter((archivedCard) => !isSameId(archivedCard.id, cardId)),
+      ]);
+      removeCardFromProject(cardId);
+      setSelectedCard(null);
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   async function restoreEpic(epicId) {
@@ -396,22 +485,60 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     }
   }
 
-  function restoreCard(cardId) {
-    setCreatedCards((cards) =>
-      cards.map((card) => (card.id === cardId ? { ...card, archived: false } : card))
-    );
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => ({
-        ...epic,
-        cards: epic.cards.map((card) => (card.id === cardId ? { ...card, archived: false } : card)),
-        sprints: (epic.sprints ?? []).map((epicSprint) => ({
-          ...epicSprint,
-          cards: epicSprint.cards.map((card) =>
-            card.id === cardId ? { ...card, archived: false } : card
-          ),
-        })),
-      }))
-    );
+  async function restoreCard(cardId) {
+    const archivedCard = archivedCards.find((card) => isSameId(card.id, cardId));
+
+    setEpicError("");
+    try {
+      let restoredCard = mapCard(await restoreCardRequest(cardId));
+      const originalSprintId = archivedCard?.originalSprintId ?? archivedCard?.sprintId ?? null;
+
+      if (originalSprintId) {
+        restoredCard = mapCard(
+          await moveCardRequest(cardId, {
+            sprint_id: originalSprintId,
+            status: toApiCardStatus(archivedCard?.originalStatus ?? restoredCard.status ?? "todo"),
+          })
+        );
+      } else {
+        restoredCard = mapCard(
+          await moveCardRequest(cardId, {
+            sprint_id: null,
+            status: toApiCardStatus(archivedCard?.originalStatus ?? "backlog"),
+          })
+        );
+      }
+
+      setArchivedCards((cards) => cards.filter((card) => !isSameId(card.id, cardId)));
+      removeCardFromProject(cardId);
+      if (restoredCard.sprintId) {
+        setLocalEpics((currentEpics) =>
+          currentEpics.map((epic) => ({
+            ...epic,
+            sprints: (epic.sprints ?? []).map((epicSprint) =>
+              epicSprint.id === restoredCard.sprintId
+                ? {
+                    ...epicSprint,
+                    cards: [...epicSprint.cards.filter((card) => !isSameId(card.id, cardId)), restoredCard],
+                  }
+                : epicSprint
+            ),
+          }))
+        );
+      } else {
+        setCreatedCards((cards) => [
+          ...cards.filter((card) => !isSameId(card.id, cardId)),
+          {
+            ...restoredCard,
+            sprintId: null,
+            sprint_id: null,
+            archived: false,
+          },
+        ]);
+      }
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   async function permanentlyDeleteEpic(epicId) {
@@ -441,9 +568,16 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     }
   }
 
-  function permanentlyDeleteCard(cardId) {
-    removeCardFromProject(cardId);
-    setSelectedCard((card) => (card?.id === cardId ? null : card));
+  async function permanentlyDeleteCard(cardId) {
+    setEpicError("");
+    try {
+      await permanentlyDeleteCardRequest(cardId);
+      setArchivedCards((cards) => cards.filter((card) => !isSameId(card.id, cardId)));
+      removeCardFromProject(cardId);
+      setSelectedCard((card) => (card?.id === cardId ? null : card));
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   function moveSprint(epicId, action) {
@@ -487,21 +621,21 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   }
 
   function findCardById(cardId) {
-    const backlogCard = createdCards.find((card) => card.id === cardId);
+    const backlogCard = createdCards.find((card) => isSameId(card.id, cardId));
 
     if (backlogCard) {
       return backlogCard;
     }
 
     for (const epic of epics) {
-      const epicCard = epic.cards.find((card) => card.id === cardId);
+      const epicCard = epic.cards.find((card) => isSameId(card.id, cardId));
 
       if (epicCard) {
         return epicCard;
       }
 
       for (const epicSprint of epic.sprints ?? []) {
-        const sprintCard = epicSprint.cards.find((card) => card.id === cardId);
+        const sprintCard = epicSprint.cards.find((card) => isSameId(card.id, cardId));
 
         if (sprintCard) {
           return sprintCard;
@@ -513,61 +647,105 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
   }
 
   function removeCardFromProject(cardId) {
-    setCreatedCards((cards) => cards.filter((card) => card.id !== cardId));
+    setCreatedCards((cards) => cards.filter((card) => !isSameId(card.id, cardId)));
     setLocalEpics((currentEpics) =>
       currentEpics.map((epic) => ({
         ...epic,
-        cards: epic.cards.filter((card) => card.id !== cardId),
+        cards: epic.cards.filter((card) => !isSameId(card.id, cardId)),
         sprints: (epic.sprints ?? []).map((epicSprint) => ({
           ...epicSprint,
-          cards: epicSprint.cards.filter((card) => card.id !== cardId),
+          cards: epicSprint.cards.filter((card) => !isSameId(card.id, cardId)),
         })),
       }))
     );
   }
 
-  function updateCardStatus(cardId, status) {
+  function applyCardUpdate(cardId, updates) {
+    setCreatedCards((cards) =>
+      cards.map((card) => (isSameId(card.id, cardId) ? { ...card, ...updates } : card))
+    );
+    setLocalEpics((currentEpics) =>
+      currentEpics.map((epic) => ({
+        ...epic,
+        cards: epic.cards.map((card) => (isSameId(card.id, cardId) ? { ...card, ...updates } : card)),
+        sprints: (epic.sprints ?? []).map((epicSprint) => ({
+          ...epicSprint,
+          cards: epicSprint.cards.map((card) =>
+            isSameId(card.id, cardId) ? { ...card, ...updates } : card
+          ),
+        })),
+      }))
+    );
+    setSelectedCard((card) => (isSameId(card?.id, cardId) ? { ...card, ...updates } : card));
+  }
+
+  async function updateCardStatus(cardId, status) {
     const statusLabel = projectStatuses.find((option) => option.value === status)?.label ?? formatStatusLabel(status);
 
-    setCreatedCards((cards) =>
-      cards.map((card) => (card.id === cardId ? { ...card, listName: statusLabel, status } : card))
-    );
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => ({
-        ...epic,
-        cards: epic.cards.map((card) =>
-          card.id === cardId ? { ...card, listName: statusLabel, status } : card
-        ),
-        sprints: (epic.sprints ?? []).map((epicSprint) => ({
-          ...epicSprint,
-          cards: epicSprint.cards.map((card) =>
-            card.id === cardId ? { ...card, listName: statusLabel, status } : card
-          ),
-        })),
-      }))
-    );
-    setSelectedCard((card) =>
-      card?.id === cardId ? { ...card, listName: statusLabel, status } : card
-    );
+    setEpicError("");
+    try {
+      const card = mapCard(await updateCardRequest(cardId, { status: toApiCardStatus(status) }));
+      applyCardUpdate(cardId, { ...card, listName: statusLabel, status });
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
-  function updateCardDetails(cardId, updates) {
-    setCreatedCards((cards) =>
-      cards.map((card) => (card.id === cardId ? { ...card, ...updates } : card))
-    );
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => ({
-        ...epic,
-        cards: epic.cards.map((card) => (card.id === cardId ? { ...card, ...updates } : card)),
-        sprints: (epic.sprints ?? []).map((epicSprint) => ({
-          ...epicSprint,
-          cards: epicSprint.cards.map((card) =>
-            card.id === cardId ? { ...card, ...updates } : card
-          ),
-        })),
-      }))
-    );
-    setSelectedCard((card) => (card?.id === cardId ? { ...card, ...updates } : card));
+  async function updateCardDetails(cardId, updates) {
+    const payload = {};
+    if ("title" in updates) {
+      payload.title = updates.title;
+    }
+    if ("description" in updates) {
+      payload.description = updates.description;
+    }
+    if ("status" in updates) {
+      payload.status = toApiCardStatus(updates.status);
+    }
+
+    setEpicError("");
+    try {
+      let card = findCardById(cardId);
+      if (Object.keys(payload).length > 0) {
+        card = mapCard(await updateCardRequest(cardId, payload));
+      }
+
+      if ("sprintId" in updates) {
+        const nextSprintId = updates.sprintId ?? null;
+        if (nextSprintId) {
+          const targetEpic = localEpics.find((epic) =>
+            epic.sprints?.some((epicSprint) => epicSprint.id === nextSprintId)
+          );
+          if (targetEpic && card?.epicId !== targetEpic.id) {
+            card = mapCard(await updateCardRequest(cardId, { epic_id: targetEpic.id }));
+          }
+        }
+        card = mapCard(await moveCardRequest(cardId, { sprint_id: nextSprintId }));
+      }
+
+      removeCardFromProject(cardId);
+      if (card.sprintId) {
+        setLocalEpics((currentEpics) =>
+          currentEpics.map((epic) => ({
+            ...epic,
+            cards: epic.cards.filter((epicCard) => !isSameId(epicCard.id, cardId)),
+            sprints: (epic.sprints ?? []).map((epicSprint) =>
+              epicSprint.id === card.sprintId
+                ? { ...epicSprint, cards: [...epicSprint.cards, card] }
+                : {
+                    ...epicSprint,
+                    cards: epicSprint.cards.filter((sprintCard) => !isSameId(sprintCard.id, cardId)),
+                  }
+            ),
+          }))
+        );
+      } else {
+        setCreatedCards((cards) => [...cards.filter((currentCard) => !isSameId(currentCard.id, cardId)), card]);
+      }
+      setSelectedCard((currentCard) => (isSameId(currentCard?.id, cardId) ? { ...currentCard, ...card } : currentCard));
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   function createCustomStatus(title) {
@@ -616,7 +794,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
     event.dataTransfer.effectAllowed = "move";
   }
 
-  function moveCardToBacklog(event) {
+  async function moveCardToBacklog(event) {
     event.preventDefault();
     const cardId = event.dataTransfer.getData("text/plain");
     const card = findCardById(cardId);
@@ -625,18 +803,25 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       return;
     }
 
-    removeCardFromProject(cardId);
-    setCreatedCards((cards) => [
-      ...cards,
-      {
-        ...card,
-        sprintId: null,
-        status: card.status ?? "todo",
-      },
-    ]);
+    setEpicError("");
+    try {
+      const movedCard = mapCard(await moveCardRequest(cardId, { sprint_id: null, status: "backlog" }));
+      removeCardFromProject(cardId);
+      setCreatedCards((cards) => [
+        ...cards,
+        {
+          ...card,
+          ...movedCard,
+          sprintId: null,
+          sprint_id: null,
+        },
+      ]);
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
-  function moveCardToSprint(event, epicId) {
+  async function moveCardToSprint(event, epicId) {
     event.preventDefault();
     const cardId = event.dataTransfer.getData("text/plain");
     const card = findCardById(cardId);
@@ -645,40 +830,54 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       return;
     }
 
-    removeCardFromProject(cardId);
-    setLocalEpics((currentEpics) =>
-      currentEpics.map((epic) => {
-        if (epic.id !== epicId) {
-          return epic;
-        }
+    const targetEpic = localEpics.find((epic) => epic.id === epicId);
+    const targetSprint = targetEpic?.sprints?.find((epicSprint) => !epicSprint.archived);
 
-        const targetSprint = epic.sprints?.find((epicSprint) => !epicSprint.archived);
+    if (!targetSprint) {
+      return;
+    }
 
-        if (!targetSprint) {
-          return epic;
-        }
+    setEpicError("");
+    try {
+      let nextCard = card;
+      if (card.epicId !== epicId) {
+        nextCard = mapCard(await updateCardRequest(cardId, { epic_id: epicId, status: "todo" }));
+      }
+      const movedCard = mapCard(
+        await moveCardRequest(cardId, {
+          sprint_id: targetSprint.id,
+          status: toApiCardStatus(nextCard.status ?? "todo"),
+        })
+      );
 
-        return {
-          ...epic,
-          sprints: epic.sprints.map((epicSprint) =>
-            epicSprint.id === targetSprint.id
-              ? {
-                  ...epicSprint,
-                  cards: [
-                    ...epicSprint.cards,
-                    {
-                      ...card,
-                      listName: "Todo",
-                      sprintId: epicSprint.id,
-                      status: card.status ?? "todo",
-                    },
-                  ],
-                }
-              : epicSprint
-          ),
-        };
-      })
-    );
+      removeCardFromProject(cardId);
+      setLocalEpics((currentEpics) =>
+        currentEpics.map((epic) =>
+          epic.id === epicId
+            ? {
+                ...epic,
+                sprints: epic.sprints.map((epicSprint) =>
+                  epicSprint.id === targetSprint.id
+                    ? {
+                        ...epicSprint,
+                        cards: [
+                          ...epicSprint.cards,
+                          {
+                            ...card,
+                            ...movedCard,
+                            listName: "Todo",
+                          },
+                        ],
+                      }
+                    : epicSprint
+                ),
+              }
+            : epic
+        )
+      );
+    } catch (error) {
+      setEpicError(error.message);
+    }
   }
 
   useEffect(() => {
@@ -751,7 +950,7 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
         />
       ) : activeTab === "Archived Work Items" ? (
         <ProjectArchivedWorkItems
-          archivedCards={archivedCards}
+          archivedCards={archivedCardItems}
           archivedEpics={archivedEpics}
           archivedSprints={archivedSprints}
           onPermanentlyDeleteCard={permanentlyDeleteCard}
@@ -1035,19 +1234,20 @@ function ProjectBacklogPage({ onArchiveProject, onUpdateProject, project, worksp
       {isCreatingCard && (
         <CreateCardModal
           onClose={() => setIsCreatingCard(false)}
-          onCreate={({ title, description }) => {
-            setCreatedCards((cards) => [
-              ...cards,
-              {
-                id: `created-card-${Date.now()}`,
-                title,
-                description,
-                completed: false,
-                listName: "Todo",
-                sprintId: null,
-                status: "todo",
-              },
-            ]);
+          onCreate={async ({ title, description }) => {
+            setEpicError("");
+            try {
+              const card = mapCard(
+                await createCardRequest(project.id, {
+                  title,
+                  description,
+                  status: "backlog",
+                })
+              );
+              setCreatedCards((cards) => [...cards, card]);
+            } catch (error) {
+              setEpicError(error.message);
+            }
           }}
         />
       )}

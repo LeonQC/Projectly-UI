@@ -40,7 +40,7 @@ function WorkspaceSettings({ onArchiveWorkspace, onRenameWorkspace, workspace })
         <h2>Archive workspace</h2>
         <p>Archive this workspace and hide it from the active workspace list.</p>
         <button
-          className="settings-delete-button"
+          className="settings-save-button"
           type="button"
           onClick={() => onArchiveWorkspace(workspace.id)}
         >

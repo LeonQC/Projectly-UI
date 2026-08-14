@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { createWorkspaceInvitation, deleteWorkspaceMember } from "../../lib/api.js";
+import { createWorkspaceInvitation, deleteWorkspaceMember, listProjectMembers } from "../../lib/api.js";
 
 function MemberAvatar({ initials }) {
   return <span className="member-avatar">{initials}</span>;
@@ -10,8 +10,17 @@ function RoleBadge({ role }) {
   return <span className={`member-role-badge ${role.toLowerCase()}`}>{role}</span>;
 }
 
-function WorkspaceMemberRow({ isRemoving, member, onRemove }) {
-  const isOwner = member.role?.toLowerCase() === "owner";
+function getInitials(name) {
+  return (name || "User")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function WorkspaceMemberRow({ actionLabel, isRemoving, member, onRemove }) {
 
   return (
     <article className="member-row">
@@ -26,14 +35,18 @@ function WorkspaceMemberRow({ isRemoving, member, onRemove }) {
         </div>
       </div>
       <span className="member-type">{member.membership}</span>
-      <button
-        className={`member-row-action ${isOwner ? "" : "danger"}`}
-        type="button"
-        disabled={isRemoving}
-        onClick={() => onRemove(member)}
-      >
-        {isOwner ? "Leave" : "Remove"}
-      </button>
+      {actionLabel ? (
+        <button
+          className={`member-row-action ${["Leave", "Remove"].includes(actionLabel) ? "danger" : ""}`}
+          type="button"
+          disabled={isRemoving}
+          onClick={() => onRemove(member)}
+        >
+          {actionLabel}
+        </button>
+      ) : (
+        <span className="member-row-action-placeholder" />
+      )}
     </article>
   );
 }
@@ -67,7 +80,7 @@ function SingleBoardGuestRow({ guest }) {
           <span>{guest.username}</span>
         </div>
       </div>
-      <span className="member-type">Last active {guest.lastActive}</span>
+      <span className="member-type">Project guest</span>
       <div className="guest-actions">
         <div className="guest-project-menu" ref={projectMenuRef}>
           <button
@@ -115,7 +128,7 @@ function SingleBoardGuestRow({ guest }) {
   );
 }
 
-function WorkspaceMembers({ onMembersChanged, workspace }) {
+function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
   const [activeMemberTab, setActiveMemberTab] = useState("workspace-members");
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
@@ -123,8 +136,86 @@ function WorkspaceMembers({ onMembersChanged, workspace }) {
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [removeError, setRemoveError] = useState("");
   const [removingMemberId, setRemovingMemberId] = useState(null);
+  const [projectGuests, setProjectGuests] = useState([]);
+  const [guestError, setGuestError] = useState("");
+  const [isLoadingGuests, setIsLoadingGuests] = useState(false);
   const members = workspace.members ?? [];
-  const guests = workspace.singleBoardGuests ?? [];
+  const currentMember = members.find((member) => String(member.id) === String(currentUserId));
+  const currentUserIsOwner = currentMember?.role?.toLowerCase() === "owner";
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProjectGuests() {
+      if (activeMemberTab !== "single-project-guests") {
+        return;
+      }
+
+      setIsLoadingGuests(true);
+      setGuestError("");
+      try {
+        const projectMemberGroups = await Promise.all(
+          (workspace.projects ?? []).map(async (project) => ({
+            project,
+            members: await listProjectMembers(project.id),
+          }))
+        );
+        const guestsByUserId = new Map();
+
+        projectMemberGroups.forEach(({ project, members: projectMembers }) => {
+          projectMembers
+            .filter((member) => member.membership_type === "project_guest")
+            .forEach((member) => {
+              const userId = member.user?.id ?? member.id;
+              const name = member.user?.username || member.user?.email || `User ${userId ?? ""}`.trim();
+              const existingGuest = guestsByUserId.get(userId);
+              const projectName = project.name;
+
+              if (existingGuest) {
+                existingGuest.projects.push(projectName);
+                return;
+              }
+
+              guestsByUserId.set(userId, {
+                id: userId,
+                initials: getInitials(name),
+                name,
+                username: member.user?.email ?? `@user-${userId ?? "unknown"}`,
+                projects: [projectName],
+              });
+            });
+        });
+
+        if (isMounted) {
+          setProjectGuests(Array.from(guestsByUserId.values()));
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGuestError(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGuests(false);
+        }
+      }
+    }
+
+    loadProjectGuests();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeMemberTab, workspace.projects]);
+
+  function getMemberActionLabel(member) {
+    const isCurrentUser = String(member.id) === String(currentUserId);
+
+    if (currentUserIsOwner) {
+      return isCurrentUser ? "" : "Remove";
+    }
+
+    return isCurrentUser ? "Leave" : "";
+  }
 
   async function sendWorkspaceInvitation(event) {
     event.preventDefault();
@@ -214,6 +305,7 @@ function WorkspaceMembers({ onMembersChanged, workspace }) {
           <div className="member-list">
             {members.map((member) => (
               <WorkspaceMemberRow
+                actionLabel={getMemberActionLabel(member)}
                 isRemoving={removingMemberId === (member.workspaceMemberId ?? member.id)}
                 member={member}
                 key={member.workspaceMemberId ?? member.id}
@@ -231,10 +323,17 @@ function WorkspaceMembers({ onMembersChanged, workspace }) {
           <div className="member-toolbar">
             <input type="search" placeholder="Filter by name" aria-label="Filter single-project guests by name" />
           </div>
+          {guestError && <p className="app-error">{guestError}</p>}
           <div className="member-list">
-            {guests.map((guest) => (
-              <SingleBoardGuestRow guest={guest} key={guest.id} />
-            ))}
+            {isLoadingGuests ? (
+              <p className="empty-state">Loading project guests...</p>
+            ) : projectGuests.length > 0 ? (
+              projectGuests.map((guest) => (
+                <SingleBoardGuestRow guest={guest} key={guest.id} />
+              ))
+            ) : (
+              <p className="empty-state">No single-project guests yet.</p>
+            )}
           </div>
         </section>
       )}

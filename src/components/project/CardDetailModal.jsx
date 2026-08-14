@@ -2,14 +2,17 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   createCardAttachment,
   createCardComment,
+  createCardGitHubLink,
   createCardLabel,
   createCardLink,
   createCardMember,
   deleteCardAttachment,
   deleteCardComment,
+  deleteCardGitHubLink,
   deleteCardLabel,
   deleteCardLink,
   deleteCardMember,
+  getCardDevelopment,
   getCardDetail,
   listCommentMentionUsers,
   listProjectMembers,
@@ -62,6 +65,10 @@ function formatDateTime(value) {
 
 function formatRelationship(relationship) {
   return relationship.replaceAll("_", " ");
+}
+
+function shortenSha(sha) {
+  return sha ? sha.slice(0, 7) : "";
 }
 
 function toApiRelationship(relationship) {
@@ -190,6 +197,12 @@ function CardDetailModal({
   const [commentText, setCommentText] = useState("");
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [comments, setComments] = useState([]);
+  const [development, setDevelopment] = useState(null);
+  const [githubRepo, setGithubRepo] = useState("");
+  const [githubBranch, setGithubBranch] = useState("");
+  const [githubPullRequest, setGithubPullRequest] = useState("");
+  const [githubCommit, setGithubCommit] = useState("");
+  const [githubUrl, setGithubUrl] = useState("");
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState("");
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
@@ -269,6 +282,56 @@ function CardDetailModal({
       ]);
       setLinkedCardId("");
       setLinkedRelation(workItemRelations[0]);
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
+  }
+
+  async function addGitHubLink(event) {
+    event.preventDefault();
+
+    const normalizedRepo = githubRepo.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/$/, "");
+    const [repoOwner, repoName] = normalizedRepo.split("/");
+
+    if (!repoOwner || !repoName) {
+      setDetailError("GitHub repo must use owner/repo format");
+      return;
+    }
+
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      await createCardGitHubLink(card.id, {
+        repo_owner: repoOwner,
+        repo_name: repoName,
+        branch_name: githubBranch.trim() || null,
+        pull_request_number: githubPullRequest ? Number(githubPullRequest) : null,
+        commit_sha: githubCommit.trim() || null,
+        url: githubUrl.trim() || null,
+      });
+      const developmentData = await getCardDevelopment(card.id);
+      setDevelopment(developmentData);
+      setGithubRepo("");
+      setGithubBranch("");
+      setGithubPullRequest("");
+      setGithubCommit("");
+      setGithubUrl("");
+    } catch (error) {
+      setDetailError(error.message);
+    } finally {
+      setIsSavingDetail(false);
+    }
+  }
+
+  async function removeGitHubLink(githubLinkId) {
+    setDetailError("");
+    setIsSavingDetail(true);
+    try {
+      await deleteCardGitHubLink(githubLinkId);
+      const developmentData = await getCardDevelopment(card.id);
+      setDevelopment(developmentData);
     } catch (error) {
       setDetailError(error.message);
     } finally {
@@ -603,9 +666,13 @@ function CardDetailModal({
       setComments([]);
       setLinkedWorkItems([]);
       setMentionUsers([]);
+      setDevelopment(null);
 
       try {
-        const detail = await getCardDetail(card.id);
+        const [detail, developmentData] = await Promise.all([
+          getCardDetail(card.id),
+          getCardDevelopment(card.id),
+        ]);
 
         if (!isMounted) {
           return;
@@ -639,6 +706,7 @@ function CardDetailModal({
         setCardAttachments((detail.attachments ?? []).map(mapDetailAttachment));
         setComments((detail.comments ?? []).map((comment) => mapDetailComment(comment, mappedProjectMembers)));
         setLinkedWorkItems((detail.links ?? []).map((link) => mapDetailLink(link, card.id)));
+        setDevelopment(developmentData);
       } catch (error) {
         if (isMounted) {
           setDetailError(error.message);
@@ -1080,7 +1148,143 @@ function CardDetailModal({
               <header>
                 <h3>Development</h3>
               </header>
-              <p className="empty-state">No development activity yet.</p>
+              <form className="github-link-form" onSubmit={addGitHubLink}>
+                <label>
+                  Repository
+                  <input
+                    type="text"
+                    placeholder="owner/repo"
+                    value={githubRepo}
+                    onChange={(event) => setGithubRepo(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Branch
+                  <input
+                    type="text"
+                    placeholder="main"
+                    value={githubBranch}
+                    onChange={(event) => setGithubBranch(event.target.value)}
+                  />
+                </label>
+                <label>
+                  PR
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="12"
+                    value={githubPullRequest}
+                    onChange={(event) => setGithubPullRequest(event.target.value)}
+                  />
+                </label>
+                <label>
+                  Commit
+                  <input
+                    type="text"
+                    placeholder="commit sha"
+                    value={githubCommit}
+                    onChange={(event) => setGithubCommit(event.target.value)}
+                  />
+                </label>
+                <label className="github-link-url-field">
+                  URL
+                  <input
+                    type="url"
+                    placeholder="https://github.com/owner/repo"
+                    value={githubUrl}
+                    onChange={(event) => setGithubUrl(event.target.value)}
+                  />
+                </label>
+                <button className="small-action-button" type="submit" disabled={!githubRepo.trim() || isSavingDetail}>
+                  Link GitHub
+                </button>
+              </form>
+
+              {development?.development_status?.has_github_links ? (
+                <div className="github-development-panel">
+                  <div className="github-development-summary">
+                    <span>{development.development_status.link_count} links</span>
+                    <span>{development.development_status.branch_count} branches</span>
+                    <span>{development.development_status.pull_request_count} PRs</span>
+                    <span>{development.development_status.commit_count} commits</span>
+                  </div>
+
+                  <div className="github-link-list">
+                    {development.github_links.map((link) => (
+                      <article className="github-link-item" key={link.id}>
+                        <div>
+                          <strong>{link.repo_owner}/{link.repo_name}</strong>
+                          <span>
+                            {[
+                              link.branch_name ? `branch ${link.branch_name}` : "",
+                              link.pull_request_number ? `PR #${link.pull_request_number}` : "",
+                              link.commit_sha ? `commit ${shortenSha(link.commit_sha)}` : "",
+                            ].filter(Boolean).join(" · ") || "Repository link"}
+                          </span>
+                        </div>
+                        <button
+                          className="small-action-button"
+                          type="button"
+                          disabled={isSavingDetail}
+                          onClick={() => removeGitHubLink(link.id)}
+                        >
+                          Remove
+                        </button>
+                      </article>
+                    ))}
+                  </div>
+
+                  {development.branches.length > 0 && (
+                    <div className="github-development-list">
+                      <h4>Branches</h4>
+                      {development.branches.map((branch) => (
+                        <a
+                          href={branch.latest_commit_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          key={`${branch.repo_owner}/${branch.repo_name}/${branch.name}`}
+                        >
+                          <strong>{branch.name}</strong>
+                          <span>{shortenSha(branch.latest_commit_sha)}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  {development.pull_requests.length > 0 && (
+                    <div className="github-development-list">
+                      <h4>Pull requests</h4>
+                      {development.pull_requests.map((pullRequest) => (
+                        <a
+                          href={pullRequest.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          key={`${pullRequest.repo_owner}/${pullRequest.repo_name}/${pullRequest.number}`}
+                        >
+                          <strong>#{pullRequest.number} {pullRequest.title}</strong>
+                          <span>{pullRequest.merged ? "merged" : pullRequest.state}</span>
+                        </a>
+                      ))}
+                    </div>
+                  )}
+
+                  {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])].length > 0 && (
+                    <div className="github-development-list">
+                      <h4>Commits</h4>
+                      {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])]
+                        .slice(0, 6)
+                        .map((commit) => (
+                          <a href={commit.url} target="_blank" rel="noreferrer" key={`${commit.repo_owner}/${commit.repo_name}/${commit.sha}`}>
+                            <strong>{commit.message.split("\n")[0]}</strong>
+                            <span>{shortenSha(commit.sha)} · {commit.author_name ?? "Unknown author"}</span>
+                          </a>
+                        ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <p className="github-development-empty">No GitHub links yet.</p>
+              )}
             </section>
           </section>
 

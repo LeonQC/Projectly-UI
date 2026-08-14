@@ -8,6 +8,8 @@ import {
   createWorkspace as createWorkspaceRequest,
   listArchivedProjects,
   listArchivedWorkspaces,
+  listGuestProjects,
+  listNotifications,
   listWorkspaceMembers,
   listWorkspaceProjects,
   listWorkspaces,
@@ -18,7 +20,7 @@ import {
   updateProject as updateProjectRequest,
   updateWorkspace as updateWorkspaceRequest,
 } from "../../lib/api.js";
-import { guestWorkspaces, user } from "../../data/mockWorkspaceData.js";
+import { user } from "../../data/mockWorkspaceData.js";
 import AllProjectsPage from "../../pages/app/AllProjectsPage.jsx";
 import InboxPage from "../../pages/app/InboxPage.jsx";
 import ProjectBacklogPage from "../../pages/app/ProjectBacklogPage.jsx";
@@ -58,6 +60,30 @@ function mapProject(project) {
     description: project.description ?? "",
     epics: project.epics ?? [],
   };
+}
+
+function mapGuestWorkspaces(projects) {
+  const workspaceGroups = new Map();
+
+  projects.forEach((projectData) => {
+    const project = mapProject(projectData);
+    const workspaceId = project.workspace_id;
+    const workspaceName = projectData.workspace_name ?? `Workspace ${workspaceId}`;
+    const existingWorkspace = workspaceGroups.get(workspaceId) ?? {
+      id: workspaceId,
+      name: workspaceName,
+      members: [],
+      singleBoardGuests: [],
+      projects: [],
+    };
+
+    workspaceGroups.set(workspaceId, {
+      ...existingWorkspace,
+      projects: [...existingWorkspace.projects, project],
+    });
+  });
+
+  return Array.from(workspaceGroups.values());
 }
 
 function mapWorkspaceMember(member) {
@@ -146,7 +172,6 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
         id: currentUser.id,
         name: currentUser.username,
         email: currentUser.email,
-        avatarUrl: currentUser.avatar_url,
         initials: getInitials(currentUser.username || currentUser.email),
         theme: currentUser.theme,
       }
@@ -157,19 +182,27 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
   const [activePage, setActivePage] = useState(() => getRoutePage(window.location.pathname));
   const [archivedProjects, setArchivedProjects] = useState([]);
   const [workspaces, setWorkspaces] = useState([]);
+  const [guestProjectWorkspaces, setGuestProjectWorkspaces] = useState([]);
+  const [notifications, setNotifications] = useState([]);
   const [archivedWorkspaces, setArchivedWorkspaces] = useState([]);
   const [workspaceError, setWorkspaceError] = useState("");
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
   const [pendingArchivedActionKey, setPendingArchivedActionKey] = useState("");
   const activeWorkspace =
     workspaces.find((workspace) => workspace.id === activePage.workspaceId) ?? workspaces[0] ?? null;
-  const allProjects = workspaces.flatMap((workspace) => workspace.projects);
+  const allProjects = [...workspaces, ...guestProjectWorkspaces].flatMap((workspace) => workspace.projects);
   const activeProject =
     allProjects.find((project) => project.id === activePage.projectId) ?? allProjects[0] ?? null;
   const activeProjectWorkspace =
     workspaces.find((workspace) =>
       workspace.projects.some((project) => project.id === activeProject?.id)
-    ) ?? workspaces[0] ?? null;
+    ) ??
+    guestProjectWorkspaces.find((workspace) =>
+      workspace.projects.some((project) => project.id === activeProject?.id)
+    ) ??
+    workspaces[0] ??
+    guestProjectWorkspaces[0] ??
+    null;
   const archivedProjectsWithWorkspace = archivedProjects.map((project) => ({
     ...project,
     workspaceName:
@@ -179,6 +212,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
   const activeWorkspaceArchivedProjects = archivedProjects.filter(
     (project) => project.workspace_id === activeWorkspace?.id
   );
+  const inboxUnreadCount = notifications.filter((notification) => !notification.read_at).length;
 
   useEffect(() => {
     setActivePage(getRoutePage(location.pathname));
@@ -188,10 +222,11 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
     setIsLoadingWorkspaces(true);
     setWorkspaceError("");
     try {
-      const [activeWorkspaceData, archivedWorkspaceData, archivedProjectData] = await Promise.all([
+      const [activeWorkspaceData, archivedWorkspaceData, archivedProjectData, guestProjectData] = await Promise.all([
         listWorkspaces(),
         listArchivedWorkspaces(),
         listArchivedProjects(),
+        listGuestProjects(),
       ]);
       const workspacesWithProjects = await Promise.all(
         activeWorkspaceData.map(async (workspace) => {
@@ -209,6 +244,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       );
 
       setWorkspaces(workspacesWithProjects);
+      setGuestProjectWorkspaces(mapGuestWorkspaces(guestProjectData));
       setArchivedWorkspaces(archivedWorkspaceData.map(mapWorkspace));
       setArchivedProjects(archivedProjectData.map(mapProject));
     } catch (error) {
@@ -221,6 +257,18 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
   useEffect(() => {
     loadWorkspaceData();
   }, [loadWorkspaceData]);
+
+  const loadNotificationData = useCallback(async () => {
+    try {
+      setNotifications(await listNotifications());
+    } catch {
+      setNotifications([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadNotificationData();
+  }, [loadNotificationData]);
 
   useEffect(() => {
     if (!isResizingSidebar) {
@@ -366,6 +414,24 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
     try {
       const project = mapProject(await getProjectRequest(projectId));
       setWorkspaces((currentWorkspaces) =>
+        currentWorkspaces.map((workspace) =>
+          workspace.id === project.workspace_id
+            ? {
+                ...workspace,
+                projects: workspace.projects.map((currentProject) =>
+                  currentProject.id === project.id
+                    ? {
+                        ...currentProject,
+                        ...project,
+                        epics: currentProject.epics,
+                      }
+                    : currentProject
+                ),
+              }
+            : workspace
+        )
+      );
+      setGuestProjectWorkspaces((currentWorkspaces) =>
         currentWorkspaces.map((workspace) =>
           workspace.id === project.workspace_id
             ? {
@@ -543,6 +609,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       {isSidebarVisible && (
         <Sidebar
           activePage={activePage}
+          inboxUnreadCount={inboxUnreadCount}
           onOpenArchivedProjects={openArchivedProjects}
           onOpenAllProjects={openAllProjects}
           onOpenInbox={openInbox}
@@ -552,7 +619,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           onCreateWorkspace={createWorkspace}
           onLogout={onLogout}
           user={sidebarUser}
-          guestWorkspaces={guestWorkspaces}
+          guestWorkspaces={guestProjectWorkspaces}
           workspaces={workspaces}
         />
       )}
@@ -595,7 +662,13 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
         </svg>
       </button>
       {activePage.name === "inbox" ? (
-        <InboxPage onInvitationChanged={loadWorkspaceData} onOpenCardMention={openCardMention} />
+        <InboxPage
+          notifications={notifications}
+          onInvitationChanged={loadWorkspaceData}
+          onNotificationsChanged={loadNotificationData}
+          onOpenCardMention={openCardMention}
+          setNotifications={setNotifications}
+        />
       ) : activePage.name === "user-settings" ? (
         <UserSettingsPage onUserUpdated={onUserUpdated} user={sidebarUser} />
       ) : activePage.name === "archived-workspace" ? (
@@ -618,6 +691,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
         </section>
       ) : activePage.name === "project-backlog" && activeProject && activeProjectWorkspace ? (
         <ProjectBacklogPage
+          currentUserId={sidebarUser.id}
           initialCardId={activePage.cardId}
           onArchiveProject={archiveProject}
           onCloseCardRoute={() => navigate(`/workspaces/${activeProjectWorkspace.id}/projects/${activeProject.id}`)}
@@ -632,6 +706,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
         <WorkspaceProjectsPage
           archivedProjects={activeWorkspaceArchivedProjects}
           createProjectRequestId={activePage.createProjectRequestId}
+          currentUserId={sidebarUser.id}
           initialTab={activePage.workspaceTab}
           onArchiveWorkspace={archiveWorkspace}
           onCreateProject={createProject}
@@ -654,7 +729,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
             </section>
           ) : (
             <AllProjectsPage
-              guestWorkspaces={guestWorkspaces}
+              guestWorkspaces={guestProjectWorkspaces}
               onOpenProject={openProject}
               onOpenWorkspaceProjects={openWorkspaceProjects}
               workspaces={workspaces}

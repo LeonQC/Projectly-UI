@@ -63,6 +63,7 @@ function WorkspaceNavGroup({ activePage, onOpenWorkspaceProjects, title, workspa
 function Sidebar({
   activePage,
   guestWorkspaces = [],
+  inboxUnreadCount = 0,
   onOpenArchivedProjects,
   onOpenAllProjects,
   onOpenInbox,
@@ -262,7 +263,12 @@ function Sidebar({
           type="button"
           onClick={onOpenInbox}
         >
-          Inbox
+          <span>Inbox</span>
+          {inboxUnreadCount > 0 && (
+            <span className="sidebar-unread-badge" aria-label={`${inboxUnreadCount} unread notifications`}>
+              {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
+            </span>
+          )}
         </button>
 
         <button

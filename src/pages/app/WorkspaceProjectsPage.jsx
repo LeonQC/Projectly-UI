@@ -13,10 +13,12 @@ function WorkspaceProjectsPage({
   onArchiveProject,
   onArchiveWorkspace,
   onCreateProject,
+  onMembersChanged,
   onOpenProject,
   onPermanentlyDeleteProject,
   onRenameWorkspace,
   onRestoreProject,
+  pendingArchivedActionKey,
   shouldOpenCreateProject = false,
   workspace,
 }) {
@@ -49,7 +51,7 @@ function WorkspaceProjectsPage({
       />
 
       {activeWorkspaceTab === "members" ? (
-        <WorkspaceMembers workspace={workspace} />
+        <WorkspaceMembers onMembersChanged={onMembersChanged} workspace={workspace} />
       ) : activeWorkspaceTab === "projects" ? (
         <WorkspaceProjects
           onArchiveProject={onArchiveProject}
@@ -67,6 +69,7 @@ function WorkspaceProjectsPage({
         <ArchivedProjects
           onPermanentlyDeleteProject={onPermanentlyDeleteProject}
           onRestoreProject={onRestoreProject}
+          pendingActionKey={pendingArchivedActionKey}
           projects={archivedProjects}
         />
       ) : null}

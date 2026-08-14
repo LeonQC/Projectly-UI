@@ -120,7 +120,7 @@ function App() {
   }
 
   if (page === "app") {
-    return <AppShell currentUser={currentUser} onLogout={logout} />;
+    return <AppShell currentUser={currentUser} onLogout={logout} onUserUpdated={setCurrentUser} />;
   }
 
   return (

@@ -1,5 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 
+import { createWorkspaceInvitation, deleteWorkspaceMember } from "../../lib/api.js";
+
 function MemberAvatar({ initials }) {
   return <span className="member-avatar">{initials}</span>;
 }
@@ -8,8 +10,8 @@ function RoleBadge({ role }) {
   return <span className={`member-role-badge ${role.toLowerCase()}`}>{role}</span>;
 }
 
-function WorkspaceMemberRow({ member }) {
-  const isOwner = member.role === "Owner";
+function WorkspaceMemberRow({ isRemoving, member, onRemove }) {
+  const isOwner = member.role?.toLowerCase() === "owner";
 
   return (
     <article className="member-row">
@@ -24,7 +26,12 @@ function WorkspaceMemberRow({ member }) {
         </div>
       </div>
       <span className="member-type">{member.membership}</span>
-      <button className={`member-row-action ${isOwner ? "" : "danger"}`} type="button">
+      <button
+        className={`member-row-action ${isOwner ? "" : "danger"}`}
+        type="button"
+        disabled={isRemoving}
+        onClick={() => onRemove(member)}
+      >
         {isOwner ? "Leave" : "Remove"}
       </button>
     </article>
@@ -108,10 +115,60 @@ function SingleBoardGuestRow({ guest }) {
   );
 }
 
-function WorkspaceMembers({ workspace }) {
+function WorkspaceMembers({ onMembersChanged, workspace }) {
   const [activeMemberTab, setActiveMemberTab] = useState("workspace-members");
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [inviteMessage, setInviteMessage] = useState("");
+  const [inviteError, setInviteError] = useState("");
+  const [isSendingInvite, setIsSendingInvite] = useState(false);
+  const [removeError, setRemoveError] = useState("");
+  const [removingMemberId, setRemovingMemberId] = useState(null);
   const members = workspace.members ?? [];
   const guests = workspace.singleBoardGuests ?? [];
+
+  async function sendWorkspaceInvitation(event) {
+    event.preventDefault();
+    const email = inviteEmail.trim();
+
+    if (!email) {
+      return;
+    }
+
+    setInviteMessage("");
+    setInviteError("");
+    setIsSendingInvite(true);
+    try {
+      await createWorkspaceInvitation(workspace.id, { email });
+      setInviteEmail("");
+      setInviteMessage("Workspace invitation sent.");
+    } catch (error) {
+      setInviteError(error.message);
+    } finally {
+      setIsSendingInvite(false);
+    }
+  }
+
+  async function removeWorkspaceMember(member) {
+    const memberId = member.workspaceMemberId ?? member.id;
+
+    if (!memberId) {
+      setRemoveError("Workspace member id is missing");
+      return;
+    }
+
+    setInviteMessage("");
+    setInviteError("");
+    setRemoveError("");
+    setRemovingMemberId(memberId);
+    try {
+      await deleteWorkspaceMember(memberId);
+      await onMembersChanged?.();
+    } catch (error) {
+      setRemoveError(error.message);
+    } finally {
+      setRemovingMemberId(null);
+    }
+  }
 
   return (
     <div className="workspace-members-page">
@@ -139,13 +196,29 @@ function WorkspaceMembers({ workspace }) {
           </p>
           <div className="member-toolbar">
             <input type="search" placeholder="Filter by name" aria-label="Filter workspace members by name" />
-            <button className="invite-members-button" type="button">
-              Invite workspace members
-            </button>
+            <form className="member-invite-form" onSubmit={sendWorkspaceInvitation}>
+              <input
+                type="email"
+                placeholder="Invite by email"
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+              />
+              <button className="invite-members-button" type="submit" disabled={isSendingInvite || !inviteEmail.trim()}>
+                Invite workspace members
+              </button>
+            </form>
           </div>
+          {inviteMessage && <p className="member-form-message">{inviteMessage}</p>}
+          {inviteError && <p className="app-error">{inviteError}</p>}
+          {removeError && <p className="app-error">{removeError}</p>}
           <div className="member-list">
             {members.map((member) => (
-              <WorkspaceMemberRow member={member} key={member.id} />
+              <WorkspaceMemberRow
+                isRemoving={removingMemberId === (member.workspaceMemberId ?? member.id)}
+                member={member}
+                key={member.workspaceMemberId ?? member.id}
+                onRemove={removeWorkspaceMember}
+              />
             ))}
           </div>
         </section>

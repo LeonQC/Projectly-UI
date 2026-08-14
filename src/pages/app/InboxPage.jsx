@@ -1,32 +1,113 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
+import {
+  acceptInvitation,
+  declineInvitation,
+  listNotifications,
+  markNotificationRead,
+} from "../../lib/api.js";
 
-function InboxItem({ item }) {
+function formatNotificationTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getActorName(notification) {
+  return notification.actor?.username || notification.actor?.email || "Projectly";
+}
+
+function getInvitationMessage(notification) {
+  const invitation = notification.invitation;
+  const targetLabel = invitation?.target_type === "workspace" ? "workspace" : "project";
+  return `${getActorName(notification)} invited you to join this ${targetLabel}.`;
+}
+
+function InboxItem({
+  isBusy,
+  item,
+  onAcceptInvitation,
+  onDeclineInvitation,
+  onOpenMention,
+}) {
+  const actorName = getActorName(item);
+  const isUnread = !item.read_at;
+  const isInvitation = item.type === "invitation" && item.invitation?.status === "pending";
+  const isMention = item.type === "comment_mention" && item.comment_mention;
+
   return (
-    <article className="inbox-item">
-      <div className="inbox-item-avatar">{item.actor.charAt(0)}</div>
-      <div>
+    <article className={`inbox-item ${isUnread ? "is-unread" : ""}`}>
+      <div className="inbox-item-avatar">{actorName.charAt(0).toUpperCase()}</div>
+      <div className="inbox-item-content">
         <div className="inbox-item-header">
-          <strong>{item.actor}</strong>
-          <span>{item.time}</span>
+          <strong>{item.title}</strong>
+          <span>{formatNotificationTime(item.created_at)}</span>
         </div>
-        <p>{item.message}</p>
+        <p>{isInvitation ? getInvitationMessage(item) : item.body}</p>
         <span className="inbox-item-meta">
-          {item.type === "mention"
-            ? `${item.projectName} · ${item.cardTitle}`
-            : `${item.workspaceName} · ${item.projectName}`}
+          {isInvitation
+            ? `${item.invitation.target_type} invitation`
+            : "Comment mention"}
         </span>
+
+        {isInvitation && (
+          <div className="inbox-item-actions">
+            <button
+              className="small-action-button"
+              type="button"
+              disabled={isBusy}
+              onClick={() => onAcceptInvitation(item.invitation.id)}
+            >
+              Accept
+            </button>
+            <button
+              className="inbox-secondary-button"
+              type="button"
+              disabled={isBusy}
+              onClick={() => onDeclineInvitation(item.invitation.id)}
+            >
+              Decline
+            </button>
+          </div>
+        )}
+
+        {isMention && (
+          <div className="inbox-item-actions">
+            <button
+              className="small-action-button"
+              type="button"
+              disabled={isBusy}
+              onClick={() => onOpenMention(item)}
+            >
+              Open card
+            </button>
+          </div>
+        )}
       </div>
     </article>
   );
 }
 
-function InboxSection({ emptyText, items, title }) {
+function InboxSection({ emptyText, isBusy, items, onAcceptInvitation, onDeclineInvitation, onOpenMention, title }) {
   return (
     <section className="inbox-section">
       <h2>{title}</h2>
       <div className="inbox-list">
         {items.length > 0 ? (
-          items.map((item) => <InboxItem item={item} key={item.id} />)
+          items.map((item) => (
+            <InboxItem
+              isBusy={isBusy}
+              item={item}
+              onAcceptInvitation={onAcceptInvitation}
+              onDeclineInvitation={onDeclineInvitation}
+              onOpenMention={onOpenMention}
+              key={item.id}
+            />
+          ))
         ) : (
           <p className="empty-state">{emptyText}</p>
         )}
@@ -35,9 +116,75 @@ function InboxSection({ emptyText, items, title }) {
   );
 }
 
-function InboxPage({ inboxItems }) {
-  const mentions = inboxItems.filter((item) => item.type === "mention");
-  const invitations = inboxItems.filter((item) => item.type === "project-invite");
+function InboxPage({ onInvitationChanged, onOpenCardMention }) {
+  const [notifications, setNotifications] = useState([]);
+  const [inboxError, setInboxError] = useState("");
+  const [isLoadingInbox, setIsLoadingInbox] = useState(true);
+  const [busyId, setBusyId] = useState(null);
+  const mentions = notifications.filter((item) => item.type === "comment_mention");
+  const invitations = notifications.filter((item) => item.type === "invitation" && item.invitation?.status === "pending");
+
+  async function loadInbox() {
+    setIsLoadingInbox(true);
+    setInboxError("");
+    try {
+      setNotifications(await listNotifications());
+    } catch (error) {
+      setInboxError(error.message);
+    } finally {
+      setIsLoadingInbox(false);
+    }
+  }
+
+  useEffect(() => {
+    loadInbox();
+  }, []);
+
+  async function handleAcceptInvitation(invitationId) {
+    setBusyId(`invitation-${invitationId}`);
+    setInboxError("");
+    try {
+      await acceptInvitation(invitationId);
+      await loadInbox();
+      await onInvitationChanged?.();
+    } catch (error) {
+      setInboxError(error.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleDeclineInvitation(invitationId) {
+    setBusyId(`invitation-${invitationId}`);
+    setInboxError("");
+    try {
+      await declineInvitation(invitationId);
+      await loadInbox();
+    } catch (error) {
+      setInboxError(error.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleOpenMention(notification) {
+    const target = notification.comment_mention;
+
+    if (!target) {
+      return;
+    }
+
+    setBusyId(`notification-${notification.id}`);
+    setInboxError("");
+    try {
+      await markNotificationRead(notification.id);
+      onOpenCardMention?.(target);
+    } catch (error) {
+      setInboxError(error.message);
+    } finally {
+      setBusyId(null);
+    }
+  }
 
   return (
     <section className="app-content" aria-labelledby="inbox-title">
@@ -47,9 +194,35 @@ function InboxPage({ inboxItems }) {
         </div>
       </header>
 
+      {inboxError && <p className="app-error">{inboxError}</p>}
+
       <div className="inbox-page">
-        <InboxSection emptyText="No mentions yet." items={mentions} title="Mentions" />
-        <InboxSection emptyText="No project invitations yet." items={invitations} title="Project invitations" />
+        {isLoadingInbox ? (
+          <section className="inbox-section">
+            <p className="empty-state">Loading notifications...</p>
+          </section>
+        ) : (
+          <>
+            <InboxSection
+              emptyText="No mentions yet."
+              isBusy={Boolean(busyId)}
+              items={mentions}
+              onAcceptInvitation={handleAcceptInvitation}
+              onDeclineInvitation={handleDeclineInvitation}
+              onOpenMention={handleOpenMention}
+              title="Mentions"
+            />
+            <InboxSection
+              emptyText="No invitations yet."
+              isBusy={Boolean(busyId)}
+              items={invitations}
+              onAcceptInvitation={handleAcceptInvitation}
+              onDeclineInvitation={handleDeclineInvitation}
+              onOpenMention={handleOpenMention}
+              title="Invitations"
+            />
+          </>
+        )}
       </div>
     </section>
   );

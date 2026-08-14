@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-function ArchivedProjectTile({ onPermanentlyDeleteProject, onRestoreProject, project }) {
+function ArchivedProjectTile({ isBusy, onPermanentlyDeleteProject, onRestoreProject, project }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -40,6 +40,7 @@ function ArchivedProjectTile({ onPermanentlyDeleteProject, onRestoreProject, pro
           <span className="project-dropdown-menu">
             <button
               type="button"
+              disabled={isBusy}
               onClick={() => {
                 setIsMenuOpen(false);
                 onRestoreProject(project.id);
@@ -50,6 +51,7 @@ function ArchivedProjectTile({ onPermanentlyDeleteProject, onRestoreProject, pro
             <button
               className="danger"
               type="button"
+              disabled={isBusy}
               onClick={() => {
                 setIsMenuOpen(false);
                 onPermanentlyDeleteProject(project.id);
@@ -64,7 +66,7 @@ function ArchivedProjectTile({ onPermanentlyDeleteProject, onRestoreProject, pro
   );
 }
 
-function ArchivedWorkspaceTile({ onPermanentlyDeleteWorkspace, onRestoreWorkspace, workspace }) {
+function ArchivedWorkspaceTile({ isBusy, onPermanentlyDeleteWorkspace, onRestoreWorkspace, workspace }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -104,6 +106,7 @@ function ArchivedWorkspaceTile({ onPermanentlyDeleteWorkspace, onRestoreWorkspac
           <span className="project-dropdown-menu">
             <button
               type="button"
+              disabled={isBusy}
               onClick={() => {
                 setIsMenuOpen(false);
                 onRestoreWorkspace(workspace.id);
@@ -114,6 +117,7 @@ function ArchivedWorkspaceTile({ onPermanentlyDeleteWorkspace, onRestoreWorkspac
             <button
               className="danger"
               type="button"
+              disabled={isBusy}
               onClick={() => {
                 setIsMenuOpen(false);
                 onPermanentlyDeleteWorkspace(workspace.id);
@@ -133,6 +137,7 @@ function ArchivedProjects({
   onPermanentlyDeleteWorkspace,
   onRestoreProject,
   onRestoreWorkspace,
+  pendingActionKey,
   projects = [],
   workspaces = [],
 }) {
@@ -144,6 +149,7 @@ function ArchivedProjects({
         <>
           {workspaces.map((workspace) => (
             <ArchivedWorkspaceTile
+              isBusy={pendingActionKey === `workspace:${workspace.id}`}
               onPermanentlyDeleteWorkspace={onPermanentlyDeleteWorkspace}
               onRestoreWorkspace={onRestoreWorkspace}
               workspace={workspace}
@@ -152,6 +158,7 @@ function ArchivedProjects({
           ))}
           {projects.map((project) => (
             <ArchivedProjectTile
+              isBusy={pendingActionKey === `project:${project.id}`}
               onPermanentlyDeleteProject={onPermanentlyDeleteProject}
               onRestoreProject={onRestoreProject}
               project={project}

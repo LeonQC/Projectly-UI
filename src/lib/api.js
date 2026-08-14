@@ -71,6 +71,35 @@ export async function getCurrentUser() {
   return payload.data;
 }
 
+export async function getUserSettings() {
+  const payload = await apiFetch("/user-settings");
+  return payload.data;
+}
+
+export async function updateUsername(username) {
+  const payload = await apiFetch("/user-settings/username", {
+    method: "PATCH",
+    body: JSON.stringify({ username }),
+  });
+  return payload.data;
+}
+
+export async function updateEmail(email) {
+  const payload = await apiFetch("/user-settings/email", {
+    method: "PATCH",
+    body: JSON.stringify({ email }),
+  });
+  return payload.data;
+}
+
+export async function updateUserTheme(theme) {
+  const payload = await apiFetch("/user-settings/theme", {
+    method: "PATCH",
+    body: JSON.stringify({ theme }),
+  });
+  return payload.data;
+}
+
 export async function listWorkspaces() {
   const payload = await apiFetch("/workspaces");
   return payload.data;
@@ -120,6 +149,17 @@ export async function permanentlyDeleteWorkspace(workspaceId) {
 export async function listWorkspaceProjects(workspaceId) {
   const payload = await apiFetch(`/workspaces/${workspaceId}/projects`);
   return payload.data;
+}
+
+export async function listWorkspaceMembers(workspaceId) {
+  const payload = await apiFetch(`/workspaces/${workspaceId}/members`);
+  return payload.data;
+}
+
+export async function deleteWorkspaceMember(memberId) {
+  return apiFetch(`/workspaces/members/${memberId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function listArchivedProjects() {
@@ -438,4 +478,46 @@ export async function permanentlyDeleteCard(cardId) {
   return apiFetch(`/cards/${cardId}/permanent`, {
     method: "DELETE",
   });
+}
+
+export async function listNotifications() {
+  const payload = await apiFetch("/notifications");
+  return payload.data;
+}
+
+export async function markNotificationRead(notificationId) {
+  const payload = await apiFetch(`/notifications/${notificationId}/read`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function acceptInvitation(invitationId) {
+  const payload = await apiFetch(`/invitations/${invitationId}/accept`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function declineInvitation(invitationId) {
+  const payload = await apiFetch(`/invitations/${invitationId}/decline`, {
+    method: "PATCH",
+  });
+  return payload.data;
+}
+
+export async function createWorkspaceInvitation(workspaceId, { email, role = "member" }) {
+  const payload = await apiFetch(`/workspaces/${workspaceId}/invitations`, {
+    method: "POST",
+    body: JSON.stringify({ email, role }),
+  });
+  return payload.data;
+}
+
+export async function createProjectInvitation(projectId, { email }) {
+  const payload = await apiFetch(`/projects/${projectId}/invitations`, {
+    method: "POST",
+    body: JSON.stringify({ email, role: "guest" }),
+  });
+  return payload.data;
 }

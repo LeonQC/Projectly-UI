@@ -8,6 +8,7 @@ import WorkspaceTabs from "../../components/workspace/WorkspaceTabs.jsx";
 
 function WorkspaceProjectsPage({
   archivedProjects = [],
+  canManageWorkspace = true,
   createProjectRequestId,
   currentUserId,
   initialTab = "projects",
@@ -28,10 +29,16 @@ function WorkspaceProjectsPage({
   const activeProjects = workspace.projects.filter((project) => !project.archived);
 
   useEffect(() => {
-    if (shouldOpenCreateProject) {
+    if (canManageWorkspace && shouldOpenCreateProject) {
       setIsCreatingProject(true);
     }
-  }, [createProjectRequestId, shouldOpenCreateProject]);
+  }, [canManageWorkspace, createProjectRequestId, shouldOpenCreateProject]);
+
+  useEffect(() => {
+    if (!canManageWorkspace && ["archived-projects", "settings"].includes(activeWorkspaceTab)) {
+      setActiveWorkspaceTab("projects");
+    }
+  }, [activeWorkspaceTab, canManageWorkspace]);
 
   return (
     <section className="app-content" aria-labelledby="workspace-projects-title">
@@ -40,13 +47,14 @@ function WorkspaceProjectsPage({
           <span className="workspace-board-avatar">{workspace.name.charAt(0)}</span>
           <h1 id="workspace-projects-title">{workspace.name}</h1>
         </div>
-        {activeWorkspaceTab === "projects" && (
+        {canManageWorkspace && activeWorkspaceTab === "projects" && (
           <CreateProjectButton onClick={() => setIsCreatingProject(true)} />
         )}
       </header>
 
       <WorkspaceTabs
         activeTab={activeWorkspaceTab}
+        canManageWorkspace={canManageWorkspace}
         onChangeTab={setActiveWorkspaceTab}
         workspaceName={workspace.name}
       />
@@ -55,6 +63,7 @@ function WorkspaceProjectsPage({
         <WorkspaceMembers currentUserId={currentUserId} onMembersChanged={onMembersChanged} workspace={workspace} />
       ) : activeWorkspaceTab === "projects" ? (
         <WorkspaceProjects
+          canManageWorkspace={canManageWorkspace}
           onArchiveProject={onArchiveProject}
           onCreateProject={() => setIsCreatingProject(true)}
           onOpenProject={onOpenProject}
@@ -75,7 +84,7 @@ function WorkspaceProjectsPage({
         />
       ) : null}
 
-      {isCreatingProject && (
+      {canManageWorkspace && isCreatingProject && (
         <CreateProjectModal
           onClose={() => setIsCreatingProject(false)}
           onCreate={(projectInput) => onCreateProject(workspace.id, projectInput)}

@@ -18,10 +18,14 @@ function ProjectTab({ isActive = false, label, onClick }) {
   );
 }
 
-function ProjectTabs({ activeTab, onChangeTab, projectName }) {
+function ProjectTabs({ activeTab, canManageWorkspace = true, onChangeTab, projectName }) {
+  const visibleTabs = canManageWorkspace
+    ? projectTabs
+    : projectTabs.filter((tab) => !["Archived Work Items", "Settings"].includes(tab));
+
   return (
     <nav className="workspace-tabs" aria-label={`${projectName} sections`}>
-      {projectTabs.map((tab) => (
+      {visibleTabs.map((tab) => (
         <ProjectTab
           isActive={tab === activeTab}
           label={tab}

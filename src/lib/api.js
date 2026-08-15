@@ -32,6 +32,10 @@ export async function apiFetch(path, options = {}) {
   const payload = contentType.includes("application/json") ? await response.json() : null;
 
   if (!response.ok) {
+    if (response.status === 403) {
+      throw new Error("You do not have permission to perform this action.");
+    }
+
     const detail = payload?.detail;
     const message = Array.isArray(detail)
       ? detail.map((item) => item.msg).join(" ")

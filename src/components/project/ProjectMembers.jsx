@@ -47,7 +47,8 @@ function getInitials(name) {
 
 function formatProjectMember(member, currentUserId, canRemoveProjectGuests) {
   const name = member.user?.username || member.user?.email || `User ${member.user?.id ?? ""}`.trim();
-  const role = member.membership_type === "project_guest" ? "Guest" : "Admin";
+  const normalizedRole = member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : "Member";
+  const role = member.membership_type === "project_guest" ? "Guest" : normalizedRole;
   const userId = member.user?.id ?? member.id;
   const isCurrentUser = String(userId) === String(currentUserId);
   const canActOnGuest = member.membership_type === "project_guest" && (isCurrentUser || canRemoveProjectGuests);
@@ -71,6 +72,7 @@ function ProjectMembers({ currentUserId, project }) {
   const [inviteError, setInviteError] = useState("");
   const [isSendingInvite, setIsSendingInvite] = useState(false);
   const [projectMembers, setProjectMembers] = useState([]);
+  const [canManageProjectGuests, setCanManageProjectGuests] = useState(false);
   const [isLoadingMembers, setIsLoadingMembers] = useState(false);
 
   useEffect(() => {
@@ -88,6 +90,7 @@ function ProjectMembers({ currentUserId, project }) {
           const canRemoveProjectGuests =
             currentMember?.membership_type === "workspace" &&
             ["admin", "owner"].includes(currentMember.role);
+          setCanManageProjectGuests(canRemoveProjectGuests);
           setProjectMembers(
             members.map((member) => formatProjectMember(member, currentUserId, canRemoveProjectGuests))
           );
@@ -160,17 +163,19 @@ function ProjectMembers({ currentUserId, project }) {
               Manage all users who can access this project, including workspace members and single-board members.
             </p>
           </div>
-          <form className="member-invite-form" onSubmit={sendProjectInvitation}>
-            <input
-              type="email"
-              placeholder="Invite by email"
-              value={inviteEmail}
-              onChange={(event) => setInviteEmail(event.target.value)}
-            />
-            <button className="invite-members-button" type="submit" disabled={isSendingInvite || !inviteEmail.trim()}>
-              Invite user
-            </button>
-          </form>
+          {canManageProjectGuests && (
+            <form className="member-invite-form" onSubmit={sendProjectInvitation}>
+              <input
+                type="email"
+                placeholder="Invite by email"
+                value={inviteEmail}
+                onChange={(event) => setInviteEmail(event.target.value)}
+              />
+              <button className="invite-members-button" type="submit" disabled={isSendingInvite || !inviteEmail.trim()}>
+                Invite user
+              </button>
+            </form>
+          )}
         </div>
         {inviteMessage && <p className="member-form-message">{inviteMessage}</p>}
         {inviteError && <p className="app-error">{inviteError}</p>}

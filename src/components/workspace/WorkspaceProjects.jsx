@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-function ProjectTile({ onArchiveProject, onOpenProject, project }) {
+function ProjectTile({ canManageWorkspace = true, onArchiveProject, onOpenProject, project }) {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef(null);
 
@@ -23,51 +23,53 @@ function ProjectTile({ onArchiveProject, onOpenProject, project }) {
   return (
     <button className="board-tile" type="button" onClick={() => onOpenProject(project.id)}>
       <span>{project.name}</span>
-      <span className="project-tile-menu" ref={menuRef}>
-        <span
-          className="board-menu"
-          role="button"
-          tabIndex={0}
-          aria-label={`Open ${project.name} menu`}
-          aria-expanded={isMenuOpen}
-          onClick={(event) => {
-            event.stopPropagation();
-            setIsMenuOpen((isOpen) => !isOpen);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
+      {canManageWorkspace && (
+        <span className="project-tile-menu" ref={menuRef}>
+          <span
+            className="board-menu"
+            role="button"
+            tabIndex={0}
+            aria-label={`Open ${project.name} menu`}
+            aria-expanded={isMenuOpen}
+            onClick={(event) => {
               event.stopPropagation();
               setIsMenuOpen((isOpen) => !isOpen);
-            }
-          }}
-        >
-          ...
-        </span>
-        {isMenuOpen && (
-          <span className="project-dropdown-menu">
-            <span
-              role="button"
-              tabIndex={0}
-              onClick={(event) => {
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") {
+                event.preventDefault();
                 event.stopPropagation();
-                setIsMenuOpen(false);
-                onArchiveProject(project.id);
-              }}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
+                setIsMenuOpen((isOpen) => !isOpen);
+              }
+            }}
+          >
+            ...
+          </span>
+          {isMenuOpen && (
+            <span className="project-dropdown-menu">
+              <span
+                role="button"
+                tabIndex={0}
+                onClick={(event) => {
                   event.stopPropagation();
                   setIsMenuOpen(false);
                   onArchiveProject(project.id);
-                }
-              }}
-            >
-              Archive project
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    setIsMenuOpen(false);
+                    onArchiveProject(project.id);
+                  }
+                }}
+              >
+                Archive project
+              </span>
             </span>
-          </span>
-        )}
-      </span>
+          )}
+        </span>
+      )}
     </button>
   );
 }
@@ -88,18 +90,19 @@ function CreateProjectTile({ onClick }) {
   );
 }
 
-function WorkspaceProjects({ onArchiveProject, onCreateProject, onOpenProject, projects }) {
+function WorkspaceProjects({ canManageWorkspace = true, onArchiveProject, onCreateProject, onOpenProject, projects }) {
   return (
     <div className="workspace-board-grid">
       {projects.map((project) => (
         <ProjectTile
+          canManageWorkspace={canManageWorkspace}
           onArchiveProject={onArchiveProject}
           onOpenProject={onOpenProject}
           project={project}
           key={project.id}
         />
       ))}
-      <CreateProjectTile onClick={onCreateProject} />
+      {canManageWorkspace && <CreateProjectTile onClick={onCreateProject} />}
     </div>
   );
 }

@@ -15,10 +15,14 @@ function WorkspaceTab({ isActive = false, label, onClick }) {
   );
 }
 
-function WorkspaceTabs({ activeTab, onChangeTab, workspaceName }) {
+function WorkspaceTabs({ activeTab, canManageWorkspace = true, onChangeTab, workspaceName }) {
+  const visibleTabs = canManageWorkspace
+    ? workspaceTabs
+    : workspaceTabs.filter((tab) => !["archived-projects", "settings"].includes(tab.id));
+
   return (
     <nav className="workspace-tabs" aria-label={`${workspaceName} sections`}>
-      {workspaceTabs.map((tab) => (
+      {visibleTabs.map((tab) => (
         <WorkspaceTab
           isActive={activeTab === tab.id}
           label={tab.label}

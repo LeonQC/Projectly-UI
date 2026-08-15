@@ -72,6 +72,7 @@ function Sidebar({
   onOpenWorkspaceProjects,
   onCreateWorkspace,
   onLogout,
+  showArchivedWorkspace = true,
   user,
   workspaces,
 }) {
@@ -286,14 +287,16 @@ function Sidebar({
         title="YOUR WORKSPACES"
         workspaces={workspaces}
       >
-        <button
-          className={`workspace-item archived-workspace-item ${activePage.name === "archived-workspace" ? "is-active" : ""}`}
-          type="button"
-          onClick={onOpenArchivedProjects}
-        >
-          <span className="workspace-icon">D</span>
-          <span>Archived Workspace</span>
-        </button>
+        {showArchivedWorkspace && (
+          <button
+            className={`workspace-item archived-workspace-item ${activePage.name === "archived-workspace" ? "is-active" : ""}`}
+            type="button"
+            onClick={onOpenArchivedProjects}
+          >
+            <span className="workspace-icon">D</span>
+            <span>Archived Workspace</span>
+          </button>
+        )}
         <button className="create-workspace-button" type="button" onClick={() => setIsCreatingWorkspace(true)}>
           + Create new workspace
         </button>

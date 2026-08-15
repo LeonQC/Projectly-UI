@@ -1,12 +1,12 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 
-import { createProjectInvitation } from "../../lib/api.js";
+import { createProjectInvitation, deleteProjectMember, listProjectMembers } from "../../lib/api.js";
 
 function ProjectMemberAvatar({ initials }) {
   return <span className="member-avatar">{initials}</span>;
 }
 
-function ProjectMemberRow({ actionLabel, actionTone = "default", member, memberType, role }) {
+function ProjectMemberRow({ actionLabel, actionTone = "default", member, memberType, onAction, role }) {
   return (
     <article className="member-row">
       <div className="member-profile">
@@ -20,37 +20,113 @@ function ProjectMemberRow({ actionLabel, actionTone = "default", member, memberT
         </div>
       </div>
       <span className="member-type">{memberType}</span>
-      <button className={`member-row-action ${actionTone === "danger" ? "danger" : ""}`} type="button">
-        {actionLabel}
-      </button>
+      {actionLabel ? (
+        <button
+          className={`member-row-action ${actionTone === "danger" ? "danger" : ""}`}
+          type="button"
+          onClick={onAction}
+        >
+          {actionLabel}
+        </button>
+      ) : (
+        <span className="member-row-action-placeholder" />
+      )}
     </article>
   );
 }
 
-function ProjectMembers({ project, workspace }) {
+function getInitials(name) {
+  return (name || "User")
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+}
+
+function formatProjectMember(member, currentUserId, canRemoveProjectGuests) {
+  const name = member.user?.username || member.user?.email || `User ${member.user?.id ?? ""}`.trim();
+  const role = member.membership_type === "project_guest" ? "Guest" : "Admin";
+  const userId = member.user?.id ?? member.id;
+  const isCurrentUser = String(userId) === String(currentUserId);
+  const canActOnGuest = member.membership_type === "project_guest" && (isCurrentUser || canRemoveProjectGuests);
+
+  return {
+    id: userId,
+    projectMemberId: member.id,
+    initials: getInitials(name),
+    name,
+    username: member.user?.email ?? `@user-${member.user?.id ?? "unknown"}`,
+    actionLabel: canActOnGuest ? (isCurrentUser ? "Leave" : "Remove") : "",
+    actionTone: canActOnGuest ? "danger" : "default",
+    memberType: member.membership_type === "project_guest" ? "Project guest" : "Workspace member",
+    role,
+  };
+}
+
+function ProjectMembers({ currentUserId, project }) {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteMessage, setInviteMessage] = useState("");
   const [inviteError, setInviteError] = useState("");
   const [isSendingInvite, setIsSendingInvite] = useState(false);
-  const workspaceMembers = workspace.members ?? [];
-  const singleProjectGuests = (workspace.singleBoardGuests ?? []).filter((guest) =>
-    guest.projects.includes(project.name)
-  );
-  const projectGuests = [
-    ...workspaceMembers.map((member) => ({
-      ...member,
-      actionLabel: member.role === "Owner" ? "Leave" : "Remove",
-      actionTone: member.role === "Owner" ? "default" : "danger",
-      memberType: "Workspace member",
-      role: member.role,
-    })),
-    ...singleProjectGuests.map((guest) => ({
-      ...guest,
-      actionLabel: "Remove",
-      actionTone: "danger",
-      memberType: "Single-board member",
-    })),
-  ];
+  const [projectMembers, setProjectMembers] = useState([]);
+  const [isLoadingMembers, setIsLoadingMembers] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProjectMembers() {
+      setIsLoadingMembers(true);
+      setInviteError("");
+      try {
+        const members = await listProjectMembers(project.id);
+        if (isMounted) {
+          const currentMember = members.find(
+            (member) => String(member.user?.id) === String(currentUserId)
+          );
+          const canRemoveProjectGuests =
+            currentMember?.membership_type === "workspace" &&
+            ["admin", "owner"].includes(currentMember.role);
+          setProjectMembers(
+            members.map((member) => formatProjectMember(member, currentUserId, canRemoveProjectGuests))
+          );
+        }
+      } catch (error) {
+        if (isMounted) {
+          setInviteError(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingMembers(false);
+        }
+      }
+    }
+
+    loadProjectMembers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [currentUserId, project.id]);
+
+  async function removeProjectMember(member) {
+    if (!member.projectMemberId) {
+      return;
+    }
+
+    setInviteMessage("");
+    setInviteError("");
+    try {
+      await deleteProjectMember(member.projectMemberId);
+      setProjectMembers((currentMembers) =>
+        currentMembers.filter((currentMember) => currentMember.projectMemberId !== member.projectMemberId)
+      );
+      setInviteMessage(member.actionLabel === "Leave" ? "You left this project." : "Project guest removed.");
+    } catch (error) {
+      setInviteError(error.message);
+    }
+  }
 
   async function sendProjectInvitation(event) {
     event.preventDefault();
@@ -100,16 +176,21 @@ function ProjectMembers({ project, workspace }) {
         {inviteError && <p className="app-error">{inviteError}</p>}
 
         <div className="member-list">
-          {projectGuests.map((guest) => (
-            <ProjectMemberRow
-              actionLabel={guest.actionLabel}
-              actionTone={guest.actionTone}
-              member={guest}
-              memberType={guest.memberType}
-              role={guest.role}
-              key={`${guest.memberType}-${guest.id}`}
-            />
-          ))}
+          {isLoadingMembers ? (
+            <p className="empty-state">Loading project members...</p>
+          ) : (
+            projectMembers.map((member) => (
+              <ProjectMemberRow
+                actionLabel={member.actionLabel}
+                actionTone={member.actionTone}
+                member={member}
+                memberType={member.memberType}
+                onAction={() => removeProjectMember(member)}
+                role={member.role}
+                key={`${member.memberType}-${member.id}`}
+              />
+            ))
+          )}
         </div>
       </section>
     </div>

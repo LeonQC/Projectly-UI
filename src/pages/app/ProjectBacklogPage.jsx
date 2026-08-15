@@ -6,6 +6,7 @@ import CreateSprintModal from "../../components/project/CreateSprintModal.jsx";
 import ProjectBacklog from "../../components/project/ProjectBacklog.jsx";
 import ProjectArchivedWorkItems from "../../components/project/ProjectArchivedWorkItems.jsx";
 import ProjectBoard, { cardStatuses } from "../../components/project/ProjectBoard.jsx";
+import ProjectDevelopment from "../../components/project/ProjectDevelopment.jsx";
 import ProjectMembers from "../../components/project/ProjectMembers.jsx";
 import ProjectSettings from "../../components/project/ProjectSettings.jsx";
 import ProjectSummary from "../../components/project/ProjectSummary.jsx";
@@ -18,6 +19,7 @@ import {
   createCard as createCardRequest,
   createEpic as createEpicRequest,
   createSprint as createSprintRequest,
+  getProjectDevelopment,
   listEpicSprints,
   listArchivedProjectCards,
   listProjectCards,
@@ -117,6 +119,7 @@ function isSameId(leftId, rightId) {
 }
 
 function ProjectBacklogPage({
+  currentUserId,
   initialCardId,
   onArchiveProject,
   onCloseCardRoute,
@@ -147,6 +150,8 @@ function ProjectBacklogPage({
   const [sprintGoal, setSprintGoal] = useState("");
   const [createdCards, setCreatedCards] = useState([]);
   const [archivedCards, setArchivedCards] = useState([]);
+  const [projectDevelopment, setProjectDevelopment] = useState(null);
+  const [isLoadingDevelopment, setIsLoadingDevelopment] = useState(false);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
   const [projectStatuses, setProjectStatuses] = useState(cardStatuses);
@@ -314,6 +319,39 @@ function ProjectBacklogPage({
       isMounted = false;
     };
   }, [project.id]);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadProjectDevelopment() {
+      if (activeTab !== "Development") {
+        return;
+      }
+
+      setIsLoadingDevelopment(true);
+      setEpicError("");
+      try {
+        const developmentData = await getProjectDevelopment(project.id);
+        if (isMounted) {
+          setProjectDevelopment(developmentData);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setEpicError(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingDevelopment(false);
+        }
+      }
+    }
+
+    loadProjectDevelopment();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, project.id]);
 
   function getEpicMoveActions(epic) {
     const epicIndex = epics.findIndex((currentEpic) => currentEpic.id === epic.id);
@@ -978,7 +1016,7 @@ function ProjectBacklogPage({
           sprintStats={sprintStats}
         />
       ) : activeTab === "Members" ? (
-        <ProjectMembers project={project} workspace={workspace} />
+        <ProjectMembers currentUserId={currentUserId} project={project} workspace={workspace} />
       ) : activeTab === "Settings" ? (
         <ProjectSettings
           onArchiveProject={onArchiveProject}
@@ -995,6 +1033,12 @@ function ProjectBacklogPage({
           onOpenCard={openCard}
           onStatusChange={updateCardStatus}
           statuses={statusOptions}
+        />
+      ) : activeTab === "Development" ? (
+        <ProjectDevelopment
+          development={projectDevelopment}
+          isLoading={isLoadingDevelopment}
+          onOpenCard={(developmentCard) => openCard(mapCard(developmentCard))}
         />
       ) : activeTab === "Archived Work Items" ? (
         <ProjectArchivedWorkItems

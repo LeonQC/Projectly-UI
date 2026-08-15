@@ -9,6 +9,7 @@ import WorkspaceTabs from "../../components/workspace/WorkspaceTabs.jsx";
 function WorkspaceProjectsPage({
   archivedProjects = [],
   createProjectRequestId,
+  currentUserId,
   initialTab = "projects",
   onArchiveProject,
   onArchiveWorkspace,
@@ -51,7 +52,7 @@ function WorkspaceProjectsPage({
       />
 
       {activeWorkspaceTab === "members" ? (
-        <WorkspaceMembers onMembersChanged={onMembersChanged} workspace={workspace} />
+        <WorkspaceMembers currentUserId={currentUserId} onMembersChanged={onMembersChanged} workspace={workspace} />
       ) : activeWorkspaceTab === "projects" ? (
         <WorkspaceProjects
           onArchiveProject={onArchiveProject}

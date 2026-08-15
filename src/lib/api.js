@@ -167,6 +167,11 @@ export async function listArchivedProjects() {
   return payload.data;
 }
 
+export async function listGuestProjects() {
+  const payload = await apiFetch("/projects/guest");
+  return payload.data;
+}
+
 export async function createProject(workspaceId, { description, title }) {
   const payload = await apiFetch(`/workspaces/${workspaceId}/projects`, {
     method: "POST",
@@ -186,6 +191,12 @@ export async function getProject(projectId) {
 export async function listProjectMembers(projectId) {
   const payload = await apiFetch(`/projects/${projectId}/members`);
   return payload.data;
+}
+
+export async function deleteProjectMember(memberId) {
+  return apiFetch(`/projects/members/${memberId}`, {
+    method: "DELETE",
+  });
 }
 
 export async function updateProject(projectId, updates) {
@@ -476,6 +487,30 @@ export async function restoreCard(cardId) {
 
 export async function permanentlyDeleteCard(cardId) {
   return apiFetch(`/cards/${cardId}/permanent`, {
+    method: "DELETE",
+  });
+}
+
+export async function getProjectDevelopment(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}/development`);
+  return payload.data;
+}
+
+export async function getCardDevelopment(cardId) {
+  const payload = await apiFetch(`/cards/${cardId}/development`);
+  return payload.data;
+}
+
+export async function createCardGitHubLink(cardId, link) {
+  const payload = await apiFetch(`/cards/${cardId}/development/github-links`, {
+    method: "POST",
+    body: JSON.stringify(link),
+  });
+  return payload.data;
+}
+
+export async function deleteCardGitHubLink(githubLinkId) {
+  return apiFetch(`/development/github-links/${githubLinkId}`, {
     method: "DELETE",
   });
 }

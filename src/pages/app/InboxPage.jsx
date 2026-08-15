@@ -2,7 +2,6 @@ import React, { useEffect, useState } from "react";
 import {
   acceptInvitation,
   declineInvitation,
-  listNotifications,
   markNotificationRead,
 } from "../../lib/api.js";
 
@@ -24,7 +23,9 @@ function getActorName(notification) {
 function getInvitationMessage(notification) {
   const invitation = notification.invitation;
   const targetLabel = invitation?.target_type === "workspace" ? "workspace" : "project";
-  return `${getActorName(notification)} invited you to join this ${targetLabel}.`;
+  const inviterEmail = invitation?.inviter?.email || notification.actor?.email || getActorName(notification);
+  const targetName = invitation?.target_name || `this ${targetLabel}`;
+  return `${inviterEmail} invited you to join ${targetLabel} "${targetName}".`;
 }
 
 function InboxItem({
@@ -116,8 +117,13 @@ function InboxSection({ emptyText, isBusy, items, onAcceptInvitation, onDeclineI
   );
 }
 
-function InboxPage({ onInvitationChanged, onOpenCardMention }) {
-  const [notifications, setNotifications] = useState([]);
+function InboxPage({
+  notifications = [],
+  onInvitationChanged,
+  onNotificationsChanged,
+  onOpenCardMention,
+  setNotifications,
+}) {
   const [inboxError, setInboxError] = useState("");
   const [isLoadingInbox, setIsLoadingInbox] = useState(true);
   const [busyId, setBusyId] = useState(null);
@@ -128,7 +134,7 @@ function InboxPage({ onInvitationChanged, onOpenCardMention }) {
     setIsLoadingInbox(true);
     setInboxError("");
     try {
-      setNotifications(await listNotifications());
+      await onNotificationsChanged?.();
     } catch (error) {
       setInboxError(error.message);
     } finally {
@@ -160,6 +166,7 @@ function InboxPage({ onInvitationChanged, onOpenCardMention }) {
     try {
       await declineInvitation(invitationId);
       await loadInbox();
+      await onInvitationChanged?.();
     } catch (error) {
       setInboxError(error.message);
     } finally {
@@ -178,6 +185,13 @@ function InboxPage({ onInvitationChanged, onOpenCardMention }) {
     setInboxError("");
     try {
       await markNotificationRead(notification.id);
+      setNotifications?.((currentNotifications) =>
+        currentNotifications.map((currentNotification) =>
+          currentNotification.id === notification.id
+            ? { ...currentNotification, read_at: new Date().toISOString() }
+            : currentNotification
+        )
+      );
       onOpenCardMention?.(target);
     } catch (error) {
       setInboxError(error.message);

@@ -166,9 +166,6 @@ function UserSettingsPage({ onUserUpdated, user }) {
 
           <div className="profile-avatar-row">
             <span className="profile-avatar">{user.initials}</span>
-            <button className="settings-save-button" type="button">
-              Change avatar
-            </button>
           </div>
 
           <label className="settings-field">

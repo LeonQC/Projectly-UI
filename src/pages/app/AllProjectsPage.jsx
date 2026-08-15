@@ -74,6 +74,7 @@ function CreateProjectTile({ onClick }) {
 function WorkspaceProjects({
   workspace,
   canCreateProject = false,
+  canManageWorkspace = true,
   onOpenProject,
   onOpenWorkspaceProjects,
   showActions = true,
@@ -99,12 +100,14 @@ function WorkspaceProjects({
             >
               <MembersIcon />
             </WorkspaceActionButton>
-            <WorkspaceActionButton
-              label="Settings"
-              onClick={() => onOpenWorkspaceProjects(workspace.id, "settings")}
-            >
-              <SettingsIcon />
-            </WorkspaceActionButton>
+            {canManageWorkspace && (
+              <WorkspaceActionButton
+                label="Settings"
+                onClick={() => onOpenWorkspaceProjects(workspace.id, "settings")}
+              >
+                <SettingsIcon />
+              </WorkspaceActionButton>
+            )}
           </div>
         )}
       </header>
@@ -124,7 +127,12 @@ function WorkspaceProjects({
   );
 }
 
-function AllProjectsPage({ workspaces, guestWorkspaces, onOpenProject, onOpenWorkspaceProjects }) {
+function userCanManageWorkspace(workspace, userId) {
+  const currentMember = (workspace.members ?? []).find((member) => String(member.id) === String(userId));
+  return ["owner", "admin"].includes(currentMember?.role?.toLowerCase());
+}
+
+function AllProjectsPage({ currentUserId, workspaces, guestWorkspaces, onOpenProject, onOpenWorkspaceProjects }) {
   return (
     <section className="app-content" aria-labelledby="all-projects-title">
       <header className="page-header">
@@ -138,7 +146,8 @@ function AllProjectsPage({ workspaces, guestWorkspaces, onOpenProject, onOpenWor
           <h2 className="boards-section-title">YOUR WORKSPACES</h2>
           {workspaces.map((workspace) => (
             <WorkspaceProjects
-              canCreateProject
+              canCreateProject={userCanManageWorkspace(workspace, currentUserId)}
+              canManageWorkspace={userCanManageWorkspace(workspace, currentUserId)}
               onOpenProject={onOpenProject}
               onOpenWorkspaceProjects={onOpenWorkspaceProjects}
               workspace={workspace}

@@ -119,6 +119,7 @@ function isSameId(leftId, rightId) {
 }
 
 function ProjectBacklogPage({
+  canManageWorkspace = true,
   currentUserId,
   initialCardId,
   onArchiveProject,
@@ -152,6 +153,12 @@ function ProjectBacklogPage({
   const [archivedCards, setArchivedCards] = useState([]);
   const [projectDevelopment, setProjectDevelopment] = useState(null);
   const [isLoadingDevelopment, setIsLoadingDevelopment] = useState(false);
+
+  useEffect(() => {
+    if (!canManageWorkspace && ["Archived Work Items", "Settings"].includes(activeTab)) {
+      setActiveTab("Backlog");
+    }
+  }, [activeTab, canManageWorkspace]);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
   const [projectStatuses, setProjectStatuses] = useState(cardStatuses);
@@ -1007,7 +1014,12 @@ function ProjectBacklogPage({
       </header>
       {epicError && <p className="app-error">{epicError}</p>}
 
-      <ProjectTabs activeTab={activeTab} onChangeTab={setActiveTab} projectName={project.name} />
+      <ProjectTabs
+        activeTab={activeTab}
+        canManageWorkspace={canManageWorkspace}
+        onChangeTab={setActiveTab}
+        projectName={project.name}
+      />
 
       {activeTab === "Summary" ? (
         <ProjectSummary
@@ -1017,7 +1029,7 @@ function ProjectBacklogPage({
         />
       ) : activeTab === "Members" ? (
         <ProjectMembers currentUserId={currentUserId} project={project} workspace={workspace} />
-      ) : activeTab === "Settings" ? (
+      ) : canManageWorkspace && activeTab === "Settings" ? (
         <ProjectSettings
           onArchiveProject={onArchiveProject}
           onUpdateProject={onUpdateProject}
@@ -1040,7 +1052,7 @@ function ProjectBacklogPage({
           isLoading={isLoadingDevelopment}
           onOpenCard={(developmentCard) => openCard(mapCard(developmentCard))}
         />
-      ) : activeTab === "Archived Work Items" ? (
+      ) : canManageWorkspace && activeTab === "Archived Work Items" ? (
         <ProjectArchivedWorkItems
           archivedCards={archivedCardItems}
           archivedEpics={archivedEpics}

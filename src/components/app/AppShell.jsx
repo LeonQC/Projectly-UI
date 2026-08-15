@@ -101,6 +101,11 @@ function mapWorkspaceMember(member) {
   };
 }
 
+function userCanManageWorkspace(workspace, userId) {
+  const currentMember = (workspace.members ?? []).find((member) => String(member.id) === String(userId));
+  return ["owner", "admin"].includes(currentMember?.role?.toLowerCase());
+}
+
 function getRoutePage(pathname) {
   const cardMatch = matchPath(
     "/workspaces/:workspaceId/projects/:projectId/cards/:cardId",
@@ -213,10 +218,18 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
     (project) => project.workspace_id === activeWorkspace?.id
   );
   const inboxUnreadCount = notifications.filter((notification) => !notification.read_at).length;
+  const canManageAnyWorkspace = workspaces.some((workspace) => userCanManageWorkspace(workspace, sidebarUser.id));
 
   useEffect(() => {
     setActivePage(getRoutePage(location.pathname));
   }, [location.pathname]);
+
+  useEffect(() => {
+    if (!isLoadingWorkspaces && activePage.name === "archived-workspace" && !canManageAnyWorkspace) {
+      navigate("/");
+      setActivePage({ name: "all-projects" });
+    }
+  }, [activePage.name, canManageAnyWorkspace, isLoadingWorkspaces, navigate]);
 
   const loadWorkspaceData = useCallback(async () => {
     setIsLoadingWorkspaces(true);
@@ -618,6 +631,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           onOpenWorkspaceProjects={openWorkspaceProjects}
           onCreateWorkspace={createWorkspace}
           onLogout={onLogout}
+          showArchivedWorkspace={canManageAnyWorkspace}
           user={sidebarUser}
           guestWorkspaces={guestProjectWorkspaces}
           workspaces={workspaces}
@@ -701,6 +715,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           onUpdateProject={updateProject}
           project={activeProject}
           workspace={activeProjectWorkspace}
+          canManageWorkspace={userCanManageWorkspace(activeProjectWorkspace, sidebarUser.id)}
         />
       ) : activePage.name === "workspace-projects" && activeWorkspace ? (
         <WorkspaceProjectsPage
@@ -708,6 +723,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           createProjectRequestId={activePage.createProjectRequestId}
           currentUserId={sidebarUser.id}
           initialTab={activePage.workspaceTab}
+          canManageWorkspace={userCanManageWorkspace(activeWorkspace, sidebarUser.id)}
           onArchiveWorkspace={archiveWorkspace}
           onCreateProject={createProject}
           onRenameWorkspace={renameWorkspace}
@@ -729,6 +745,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
             </section>
           ) : (
             <AllProjectsPage
+              currentUserId={sidebarUser.id}
               guestWorkspaces={guestProjectWorkspaces}
               onOpenProject={openProject}
               onOpenWorkspaceProjects={openWorkspaceProjects}

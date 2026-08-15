@@ -141,7 +141,7 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
   const [isLoadingGuests, setIsLoadingGuests] = useState(false);
   const members = workspace.members ?? [];
   const currentMember = members.find((member) => String(member.id) === String(currentUserId));
-  const currentUserIsOwner = currentMember?.role?.toLowerCase() === "owner";
+  const currentUserCanManageMembers = ["owner", "admin"].includes(currentMember?.role?.toLowerCase());
 
   useEffect(() => {
     let isMounted = true;
@@ -210,7 +210,7 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
   function getMemberActionLabel(member) {
     const isCurrentUser = String(member.id) === String(currentUserId);
 
-    if (currentUserIsOwner) {
+    if (currentUserCanManageMembers) {
       return isCurrentUser ? "" : "Remove";
     }
 
@@ -287,17 +287,19 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
           </p>
           <div className="member-toolbar">
             <input type="search" placeholder="Filter by name" aria-label="Filter workspace members by name" />
-            <form className="member-invite-form" onSubmit={sendWorkspaceInvitation}>
-              <input
-                type="email"
-                placeholder="Invite by email"
-                value={inviteEmail}
-                onChange={(event) => setInviteEmail(event.target.value)}
-              />
-              <button className="invite-members-button" type="submit" disabled={isSendingInvite || !inviteEmail.trim()}>
-                Invite workspace members
-              </button>
-            </form>
+            {currentUserCanManageMembers && (
+              <form className="member-invite-form" onSubmit={sendWorkspaceInvitation}>
+                <input
+                  type="email"
+                  placeholder="Invite by email"
+                  value={inviteEmail}
+                  onChange={(event) => setInviteEmail(event.target.value)}
+                />
+                <button className="invite-members-button" type="submit" disabled={isSendingInvite || !inviteEmail.trim()}>
+                  Invite workspace members
+                </button>
+              </form>
+            )}
           </div>
           {inviteMessage && <p className="member-form-message">{inviteMessage}</p>}
           {inviteError && <p className="app-error">{inviteError}</p>}

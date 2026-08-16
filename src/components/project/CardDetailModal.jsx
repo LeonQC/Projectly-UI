@@ -321,6 +321,11 @@ function CardDetailModal({
       return;
     }
 
+    if (!githubUrl.trim()) {
+      setDetailError("GitHub URL is required");
+      return;
+    }
+
     setDetailError("");
     setIsSavingDetail(true);
     try {
@@ -1176,14 +1181,15 @@ function CardDetailModal({
                 <h3>Development</h3>
               </header>
               <form className="github-link-form" onSubmit={saveGitHubLink}>
-                <label>
-                  Repository
-                  <input
-                    type="text"
-                    placeholder="owner/repo"
-                    value={githubRepo}
-                    onChange={(event) => setGithubRepo(event.target.value)}
-                  />
+	        <label>
+	          Repository <span className="required-mark">*</span>
+	          <input
+	            type="text"
+	            placeholder="owner/repo"
+	            required
+	            value={githubRepo}
+	            onChange={(event) => setGithubRepo(event.target.value)}
+	          />
                 </label>
                 <label>
                   Branch
@@ -1213,16 +1219,21 @@ function CardDetailModal({
                     onChange={(event) => setGithubCommit(event.target.value)}
                   />
                 </label>
-                <label className="github-link-url-field">
-                  URL
-                  <input
-                    type="url"
-                    placeholder="https://github.com/owner/repo"
-                    value={githubUrl}
-                    onChange={(event) => setGithubUrl(event.target.value)}
-                  />
-                </label>
-                <button className="small-action-button" type="submit" disabled={!githubRepo.trim() || isSavingDetail}>
+	        <label className="github-link-url-field">
+	          URL <span className="required-mark">*</span>
+	          <input
+	            type="url"
+	            placeholder="https://github.com/owner/repo"
+	            required
+	            value={githubUrl}
+	            onChange={(event) => setGithubUrl(event.target.value)}
+	          />
+	        </label>
+	        <button
+	          className="small-action-button"
+	          type="submit"
+	          disabled={!githubRepo.trim() || !githubUrl.trim() || isSavingDetail}
+	        >
                   {editingGitHubLinkId ? "Save GitHub Link" : "Link GitHub"}
                 </button>
                 {editingGitHubLinkId && (
@@ -1259,22 +1270,24 @@ function CardDetailModal({
                             ].filter(Boolean).join(" · ") || "Repository link"}
                           </span>
                         </div>
-                        <button
-                          className="small-action-button"
-                          type="button"
-                          disabled={isSavingDetail}
-                          onClick={() => editGitHubLink(link)}
-                        >
-                          Edit
-                        </button>
-                        <button
-                          className="small-action-button"
-                          type="button"
-                          disabled={isSavingDetail}
-                          onClick={() => removeGitHubLink(link.id)}
-                        >
-                          Remove
-                        </button>
+                        <div className="github-link-actions">
+                          <button
+                            className="small-action-button"
+                            type="button"
+                            disabled={isSavingDetail}
+                            onClick={() => editGitHubLink(link)}
+                          >
+                            Edit
+                          </button>
+                          <button
+                            className="small-action-button"
+                            type="button"
+                            disabled={isSavingDetail}
+                            onClick={() => removeGitHubLink(link.id)}
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </article>
                     ))}
                   </div>

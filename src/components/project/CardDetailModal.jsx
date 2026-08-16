@@ -1181,11 +1181,13 @@ function CardDetailModal({
                 <h3>Development</h3>
               </header>
               <form className="github-link-form" onSubmit={saveGitHubLink}>
-	        <label>
-	          Repository <span className="required-mark">*</span>
-	          <input
-	            type="text"
-	            placeholder="owner/repo"
+                <label>
+                  <span className="field-label-text">
+                    Repository <span className="required-mark">*</span>
+                  </span>
+                  <input
+                    type="text"
+                    placeholder="owner/repo"
 	            required
 	            value={githubRepo}
 	            onChange={(event) => setGithubRepo(event.target.value)}
@@ -1219,11 +1221,13 @@ function CardDetailModal({
                     onChange={(event) => setGithubCommit(event.target.value)}
                   />
                 </label>
-	        <label className="github-link-url-field">
-	          URL <span className="required-mark">*</span>
-	          <input
-	            type="url"
-	            placeholder="https://github.com/owner/repo"
+                <label className="github-link-url-field">
+                  <span className="field-label-text">
+                    URL <span className="required-mark">*</span>
+                  </span>
+                  <input
+                    type="url"
+                    placeholder="https://github.com/owner/repo"
 	            required
 	            value={githubUrl}
 	            onChange={(event) => setGithubUrl(event.target.value)}

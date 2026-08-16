@@ -17,6 +17,7 @@ import {
   listCommentMentionUsers,
   listProjectMembers,
   updateCardComment,
+  updateCardGitHubLink,
 } from "../../lib/api.js";
 
 const defaultCardStatuses = [
@@ -203,6 +204,7 @@ function CardDetailModal({
   const [githubPullRequest, setGithubPullRequest] = useState("");
   const [githubCommit, setGithubCommit] = useState("");
   const [githubUrl, setGithubUrl] = useState("");
+  const [editingGitHubLinkId, setEditingGitHubLinkId] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState("");
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
@@ -289,7 +291,26 @@ function CardDetailModal({
     }
   }
 
-  async function addGitHubLink(event) {
+  function resetGitHubLinkForm() {
+    setGithubRepo("");
+    setGithubBranch("");
+    setGithubPullRequest("");
+    setGithubCommit("");
+    setGithubUrl("");
+    setEditingGitHubLinkId(null);
+  }
+
+  function editGitHubLink(link) {
+    setDetailError("");
+    setGithubRepo(`${link.repo_owner}/${link.repo_name}`);
+    setGithubBranch(link.branch_name ?? "");
+    setGithubPullRequest(link.pull_request_number ? String(link.pull_request_number) : "");
+    setGithubCommit(link.commit_sha ?? "");
+    setGithubUrl(link.url ?? "");
+    setEditingGitHubLinkId(link.id);
+  }
+
+  async function saveGitHubLink(event) {
     event.preventDefault();
 
     const normalizedRepo = githubRepo.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/$/, "");
@@ -303,21 +324,24 @@ function CardDetailModal({
     setDetailError("");
     setIsSavingDetail(true);
     try {
-      await createCardGitHubLink(card.id, {
+      const payload = {
         repo_owner: repoOwner,
         repo_name: repoName,
         branch_name: githubBranch.trim() || null,
         pull_request_number: githubPullRequest ? Number(githubPullRequest) : null,
         commit_sha: githubCommit.trim() || null,
         url: githubUrl.trim() || null,
-      });
+      };
+
+      if (editingGitHubLinkId) {
+        await updateCardGitHubLink(editingGitHubLinkId, payload);
+      } else {
+        await createCardGitHubLink(card.id, payload);
+      }
+
       const developmentData = await getCardDevelopment(card.id);
       setDevelopment(developmentData);
-      setGithubRepo("");
-      setGithubBranch("");
-      setGithubPullRequest("");
-      setGithubCommit("");
-      setGithubUrl("");
+      resetGitHubLinkForm();
     } catch (error) {
       setDetailError(error.message);
     } finally {
@@ -332,6 +356,9 @@ function CardDetailModal({
       await deleteCardGitHubLink(githubLinkId);
       const developmentData = await getCardDevelopment(card.id);
       setDevelopment(developmentData);
+      if (editingGitHubLinkId === githubLinkId) {
+        resetGitHubLinkForm();
+      }
     } catch (error) {
       setDetailError(error.message);
     } finally {
@@ -1148,7 +1175,7 @@ function CardDetailModal({
               <header>
                 <h3>Development</h3>
               </header>
-              <form className="github-link-form" onSubmit={addGitHubLink}>
+              <form className="github-link-form" onSubmit={saveGitHubLink}>
                 <label>
                   Repository
                   <input
@@ -1168,7 +1195,7 @@ function CardDetailModal({
                   />
                 </label>
                 <label>
-                  PR
+                  Pull Request
                   <input
                     type="number"
                     min="1"
@@ -1196,8 +1223,18 @@ function CardDetailModal({
                   />
                 </label>
                 <button className="small-action-button" type="submit" disabled={!githubRepo.trim() || isSavingDetail}>
-                  Link GitHub
+                  {editingGitHubLinkId ? "Save GitHub Link" : "Link GitHub"}
                 </button>
+                {editingGitHubLinkId && (
+                  <button
+                    className="small-action-button"
+                    type="button"
+                    disabled={isSavingDetail}
+                    onClick={resetGitHubLinkForm}
+                  >
+                    Cancel Edit
+                  </button>
+                )}
               </form>
 
               {development?.development_status?.has_github_links ? (
@@ -1205,7 +1242,7 @@ function CardDetailModal({
                   <div className="github-development-summary">
                     <span>{development.development_status.link_count} links</span>
                     <span>{development.development_status.branch_count} branches</span>
-                    <span>{development.development_status.pull_request_count} PRs</span>
+                    <span>{development.development_status.pull_request_count} pull requests</span>
                     <span>{development.development_status.commit_count} commits</span>
                   </div>
 
@@ -1217,11 +1254,19 @@ function CardDetailModal({
                           <span>
                             {[
                               link.branch_name ? `branch ${link.branch_name}` : "",
-                              link.pull_request_number ? `PR #${link.pull_request_number}` : "",
+                              link.pull_request_number ? `pull request #${link.pull_request_number}` : "",
                               link.commit_sha ? `commit ${shortenSha(link.commit_sha)}` : "",
                             ].filter(Boolean).join(" · ") || "Repository link"}
                           </span>
                         </div>
+                        <button
+                          className="small-action-button"
+                          type="button"
+                          disabled={isSavingDetail}
+                          onClick={() => editGitHubLink(link)}
+                        >
+                          Edit
+                        </button>
                         <button
                           className="small-action-button"
                           type="button"

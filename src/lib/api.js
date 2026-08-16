@@ -513,6 +513,14 @@ export async function createCardGitHubLink(cardId, link) {
   return payload.data;
 }
 
+export async function updateCardGitHubLink(githubLinkId, link) {
+  const payload = await apiFetch(`/development/github-links/${githubLinkId}`, {
+    method: "PATCH",
+    body: JSON.stringify(link),
+  });
+  return payload.data;
+}
+
 export async function deleteCardGitHubLink(githubLinkId) {
   return apiFetch(`/development/github-links/${githubLinkId}`, {
     method: "DELETE",

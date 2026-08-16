@@ -2905,6 +2905,13 @@ select.card-status-select {
   font-weight: 800;
 }
 
+.field-label-text {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  white-space: nowrap;
+}
+
 .github-link-form input {
   min-height: 36px;
   border: 1px solid #d0d7de;

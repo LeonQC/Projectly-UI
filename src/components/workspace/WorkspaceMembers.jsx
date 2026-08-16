@@ -1,6 +1,11 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { createWorkspaceInvitation, deleteWorkspaceMember, listProjectMembers } from "../../lib/api.js";
+import {
+  createWorkspaceInvitation,
+  deleteProjectMember,
+  deleteWorkspaceMember,
+  listProjectMembers,
+} from "../../lib/api.js";
 
 function MemberAvatar({ initials }) {
   return <span className="member-avatar">{initials}</span>;
@@ -51,9 +56,11 @@ function WorkspaceMemberRow({ actionLabel, isRemoving, member, onRemove }) {
   );
 }
 
-function SingleBoardGuestRow({ guest }) {
+function SingleBoardGuestRow({ guest, isRemoving, onRemove }) {
   const [isProjectMenuOpen, setIsProjectMenuOpen] = useState(false);
+  const [selectedProjectId, setSelectedProjectId] = useState(() => guest.projects[0]?.id ?? "");
   const projectMenuRef = useRef(null);
+  const selectedProject = guest.projects.find((project) => String(project.id) === String(selectedProjectId)) ?? guest.projects[0];
 
   useEffect(() => {
     function closeProjectMenuOnOutsideClick(event) {
@@ -89,7 +96,7 @@ function SingleBoardGuestRow({ guest }) {
             aria-expanded={isProjectMenuOpen}
             onClick={() => setIsProjectMenuOpen((isOpen) => !isOpen)}
           >
-            Projects ({guest.projects.length})
+            {selectedProject?.name ?? "Select project"}
             <svg
               aria-hidden="true"
               className={`chevron-icon ${isProjectMenuOpen ? "is-expanded" : ""}`}
@@ -110,8 +117,15 @@ function SingleBoardGuestRow({ guest }) {
           {isProjectMenuOpen && (
             <div className="guest-project-dropdown">
               {guest.projects.map((project) => (
-                <button type="button" key={project}>
-                  {project}
+                <button
+                  type="button"
+                  key={project.id}
+                  onClick={() => {
+                    setSelectedProjectId(project.id);
+                    setIsProjectMenuOpen(false);
+                  }}
+                >
+                  {project.name}
                 </button>
               ))}
             </div>
@@ -120,8 +134,13 @@ function SingleBoardGuestRow({ guest }) {
         <button className="add-to-workspace-button" type="button">
           Add to Workspace
         </button>
-        <button className="member-row-action danger" type="button">
-          Remove
+        <button
+          className="member-row-action danger"
+          type="button"
+          disabled={isRemoving || !selectedProject?.projectMemberId}
+          onClick={() => onRemove(guest, selectedProject)}
+        >
+          {isRemoving ? "Removing..." : "Remove"}
         </button>
       </div>
     </article>
@@ -139,6 +158,8 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
   const [projectGuests, setProjectGuests] = useState([]);
   const [guestError, setGuestError] = useState("");
   const [isLoadingGuests, setIsLoadingGuests] = useState(false);
+  const [removingProjectGuestId, setRemovingProjectGuestId] = useState(null);
+  const [guestRefreshKey, setGuestRefreshKey] = useState(0);
   const members = workspace.members ?? [];
   const currentMember = members.find((member) => String(member.id) === String(currentUserId));
   const currentUserCanManageMembers = ["owner", "admin"].includes(currentMember?.role?.toLowerCase());
@@ -169,10 +190,15 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
               const userId = member.user?.id ?? member.id;
               const name = member.user?.username || member.user?.email || `User ${userId ?? ""}`.trim();
               const existingGuest = guestsByUserId.get(userId);
-              const projectName = project.name;
+              const projectInfo = {
+                id: `${project.id}-${member.id}`,
+                name: project.name,
+                projectId: project.id,
+                projectMemberId: member.id,
+              };
 
               if (existingGuest) {
-                existingGuest.projects.push(projectName);
+                existingGuest.projects.push(projectInfo);
                 return;
               }
 
@@ -181,7 +207,7 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
                 initials: getInitials(name),
                 name,
                 username: member.user?.email ?? `@user-${userId ?? "unknown"}`,
-                projects: [projectName],
+                projects: [projectInfo],
               });
             });
         });
@@ -205,7 +231,7 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
     return () => {
       isMounted = false;
     };
-  }, [activeMemberTab, workspace.projects]);
+  }, [activeMemberTab, guestRefreshKey, workspace.projects]);
 
   function getMemberActionLabel(member) {
     const isCurrentUser = String(member.id) === String(currentUserId);
@@ -258,6 +284,27 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
       setRemoveError(error.message);
     } finally {
       setRemovingMemberId(null);
+    }
+  }
+
+  async function removeProjectGuest(_guest, project) {
+    const projectGuestId = project?.projectMemberId;
+
+    if (!projectGuestId) {
+      setGuestError("Project guest id is missing");
+      return;
+    }
+
+    setGuestError("");
+    setRemovingProjectGuestId(projectGuestId);
+    try {
+      await deleteProjectMember(projectGuestId);
+      setGuestRefreshKey((key) => key + 1);
+      await onMembersChanged?.();
+    } catch (error) {
+      setGuestError(error.message);
+    } finally {
+      setRemovingProjectGuestId(null);
     }
   }
 
@@ -331,7 +378,12 @@ function WorkspaceMembers({ currentUserId, onMembersChanged, workspace }) {
               <p className="empty-state">Loading project guests...</p>
             ) : projectGuests.length > 0 ? (
               projectGuests.map((guest) => (
-                <SingleBoardGuestRow guest={guest} key={guest.id} />
+                <SingleBoardGuestRow
+                  guest={guest}
+                  isRemoving={guest.projects.some((project) => project.projectMemberId === removingProjectGuestId)}
+                  key={guest.id}
+                  onRemove={removeProjectGuest}
+                />
               ))
             ) : (
               <p className="empty-state">No single-project guests yet.</p>

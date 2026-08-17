@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 
 import {
   claimGitHubAppInstallation,
+  disconnectGitHubAppInstallation,
   listGitHubAppInstallations,
   updateEmail,
   updateUsername,
@@ -51,6 +52,7 @@ function UserSettingsPage({ onUserUpdated, user }) {
   const [isSavingEmail, setIsSavingEmail] = useState(false);
   const [isSavingTheme, setIsSavingTheme] = useState(false);
   const [isLoadingGithub, setIsLoadingGithub] = useState(false);
+  const [disconnectingGithubInstallationId, setDisconnectingGithubInstallationId] = useState(null);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const themeMenuRef = useRef(null);
 
@@ -231,6 +233,22 @@ function UserSettingsPage({ onUserUpdated, user }) {
     window.location.href = githubAppInstallUrl;
   }
 
+  async function disconnectGithubApp(installationId) {
+    setGithubMessage("");
+    setGithubError("");
+    setDisconnectingGithubInstallationId(installationId);
+    try {
+      await disconnectGitHubAppInstallation(installationId);
+      const installations = await listGitHubAppInstallations();
+      setGithubInstallations(installations ?? []);
+      setGithubMessage("GitHub disconnected.");
+    } catch (error) {
+      setGithubError(error.message);
+    } finally {
+      setDisconnectingGithubInstallationId(null);
+    }
+  }
+
   return (
     <section className="app-content" aria-labelledby="user-settings-title">
       <header className="page-header">
@@ -361,7 +379,17 @@ function UserSettingsPage({ onUserUpdated, user }) {
                     <strong>{installation.account_login || "GitHub account"}</strong>
                     <span>{installation.account_type || "GitHub App installation"}</span>
                   </div>
-                  <span className="github-installation-status">Connected</span>
+                  <div className="github-installation-actions">
+                    <span className="github-installation-status">Connected</span>
+                    <button
+                      className="settings-disconnect-button"
+                      type="button"
+                      disabled={disconnectingGithubInstallationId === installation.installation_id}
+                      onClick={() => disconnectGithubApp(installation.installation_id)}
+                    >
+                      {disconnectingGithubInstallationId === installation.installation_id ? "Disconnecting..." : "Disconnect"}
+                    </button>
+                  </div>
                 </article>
               ))}
             </div>

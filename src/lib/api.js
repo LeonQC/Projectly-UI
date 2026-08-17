@@ -539,6 +539,12 @@ export async function claimGitHubAppInstallation(installationId) {
   return payload.data;
 }
 
+export async function disconnectGitHubAppInstallation(installationId) {
+  return apiFetch(`/github/app/installations/${installationId}`, {
+    method: "DELETE",
+  });
+}
+
 export async function listNotifications() {
   const payload = await apiFetch("/notifications");
   return payload.data;

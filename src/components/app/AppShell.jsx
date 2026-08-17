@@ -498,6 +498,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       );
     } catch (error) {
       setWorkspaceError(error.message);
+      throw error;
     }
   }
 

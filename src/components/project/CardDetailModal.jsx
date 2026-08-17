@@ -682,6 +682,8 @@ function CardDetailModal({
           status: fromApiCardStatus(detail.card.status) ?? card.status,
           sprintId: detail.card.sprint_id ?? card.sprintId ?? null,
           sprint_id: detail.card.sprint_id ?? card.sprintId ?? null,
+          displayId: detail.card.display_id ?? card.displayId ?? "",
+          display_id: detail.card.display_id ?? card.displayId ?? "",
           epicId: detail.card.epic_id ?? card.epicId ?? null,
           epic_id: detail.card.epic_id ?? card.epicId ?? null,
         };
@@ -792,6 +794,9 @@ function CardDetailModal({
       <section className="card-detail-modal" aria-labelledby="card-detail-title" role="dialog" aria-modal="true">
         <header className="card-detail-header">
           <div className="card-detail-meta">
+            {displayCard.displayId && (
+              <span className="card-display-id card-detail-display-id">{displayCard.displayId}</span>
+            )}
             <div className="card-status-field" ref={statusMenuRef}>
               <span>Status</span>
               <button

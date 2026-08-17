@@ -106,6 +106,8 @@ function mapCard(card) {
     epic_id: card.epic_id ?? card.epicId ?? null,
     sprintId: card.sprint_id ?? card.sprintId ?? null,
     sprint_id: card.sprint_id ?? card.sprintId ?? null,
+    displayId: card.display_id ?? card.displayId ?? "",
+    display_id: card.display_id ?? card.displayId ?? "",
     title: card.title,
     description: card.description ?? "",
     completed: status === "done",

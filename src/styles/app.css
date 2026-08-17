@@ -1989,6 +1989,24 @@ body.is-resizing-sidebar {
   white-space: nowrap;
 }
 
+.work-item-check .work-item-text {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.card-display-id {
+  display: block;
+  overflow: hidden;
+  max-width: 100%;
+  color: #626f86;
+  font-size: 11px;
+  font-weight: 800;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .status-pill {
   flex: 0 0 auto;
   border-radius: 999px;
@@ -2446,6 +2464,11 @@ body.is-resizing-sidebar {
   flex-wrap: wrap;
   align-items: center;
   gap: 10px;
+}
+
+.card-detail-display-id {
+  flex: 0 1 260px;
+  max-width: 260px;
 }
 
 .card-list-field,

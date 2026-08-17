@@ -13,6 +13,7 @@ import {
   deleteCardLink,
   deleteCardMember,
   getCardDevelopment,
+  getCardDevelopmentEvents,
   getCardDetail,
   listGitHubAppInstallations,
   listCommentMentionUsers,
@@ -72,6 +73,41 @@ function formatRelationship(relationship) {
 
 function shortenSha(sha) {
   return sha ? sha.slice(0, 7) : "";
+}
+
+function getGitHubEventTitle(event) {
+  if (event.title) {
+    return event.title;
+  }
+
+  if (event.message) {
+    return event.message.split("\n")[0];
+  }
+
+  return event.event_type === "pull_request" ? "Pull request event" : "GitHub event";
+}
+
+function getGitHubEventLabel(event) {
+  if (event.event_type === "pull_request") {
+    return event.action ? `Pull request ${event.action}` : "Pull request";
+  }
+
+  if (event.event_type === "push") {
+    return "Push";
+  }
+
+  return event.event_type.replaceAll("_", " ");
+}
+
+function getGitHubEventMeta(event) {
+  return [
+    event.repo_owner && event.repo_name ? `${event.repo_owner}/${event.repo_name}` : "",
+    event.branch_name ? `branch ${event.branch_name}` : "",
+    event.pull_request_number ? `pull request #${event.pull_request_number}` : "",
+    event.commit_sha ? `commit ${shortenSha(event.commit_sha)}` : "",
+    event.sender_login ? `by ${event.sender_login}` : "",
+    formatDateTime(event.created_at),
+  ].filter(Boolean).join(" · ");
 }
 
 function toApiRelationship(relationship) {
@@ -201,6 +237,7 @@ function CardDetailModal({
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [comments, setComments] = useState([]);
   const [development, setDevelopment] = useState(null);
+  const [githubEvents, setGithubEvents] = useState(null);
   const [githubInstallations, setGithubInstallations] = useState([]);
   const [isLoadingGithubInstallations, setIsLoadingGithubInstallations] = useState(false);
   const [githubInstallationError, setGithubInstallationError] = useState("");
@@ -329,6 +366,15 @@ function CardDetailModal({
     setEditingGitHubLinkId(link.id);
   }
 
+  async function refreshDevelopment() {
+    const [developmentData, eventsData] = await Promise.all([
+      getCardDevelopment(card.id),
+      getCardDevelopmentEvents(card.id),
+    ]);
+    setDevelopment(developmentData);
+    setGithubEvents(eventsData);
+  }
+
   async function saveGitHubLink(event) {
     event.preventDefault();
 
@@ -363,8 +409,7 @@ function CardDetailModal({
         await createCardGitHubLink(card.id, payload);
       }
 
-      const developmentData = await getCardDevelopment(card.id);
-      setDevelopment(developmentData);
+      await refreshDevelopment();
       resetGitHubLinkForm();
     } catch (error) {
       setDetailError(error.message);
@@ -378,8 +423,7 @@ function CardDetailModal({
     setIsSavingDetail(true);
     try {
       await deleteCardGitHubLink(githubLinkId);
-      const developmentData = await getCardDevelopment(card.id);
-      setDevelopment(developmentData);
+      await refreshDevelopment();
       if (editingGitHubLinkId === githubLinkId) {
         resetGitHubLinkForm();
       }
@@ -718,11 +762,13 @@ function CardDetailModal({
       setLinkedWorkItems([]);
       setMentionUsers([]);
       setDevelopment(null);
+      setGithubEvents(null);
 
       try {
-        const [detail, developmentData] = await Promise.all([
+        const [detail, developmentData, eventsData] = await Promise.all([
           getCardDetail(card.id),
           getCardDevelopment(card.id),
+          getCardDevelopmentEvents(card.id),
         ]);
 
         if (!isMounted) {
@@ -758,6 +804,7 @@ function CardDetailModal({
         setComments((detail.comments ?? []).map((comment) => mapDetailComment(comment, mappedProjectMembers)));
         setLinkedWorkItems((detail.links ?? []).map((link) => mapDetailLink(link, card.id)));
         setDevelopment(developmentData);
+        setGithubEvents(eventsData);
       } catch (error) {
         if (isMounted) {
           setDetailError(error.message);
@@ -1334,9 +1381,7 @@ function CardDetailModal({
                     <div className="github-development-panel">
                       <div className="github-development-summary">
                         <span>{development.development_status.link_count} links</span>
-                        <span>{development.development_status.branch_count} branches</span>
-                        <span>{development.development_status.pull_request_count} pull requests</span>
-                        <span>{development.development_status.commit_count} commits</span>
+                        <span>{githubEvents?.events?.length ?? 0} events</span>
                       </div>
 
                       <div className="github-link-list">
@@ -1374,52 +1419,23 @@ function CardDetailModal({
                         ))}
                       </div>
 
-                      {development.branches.length > 0 && (
+                      {githubEvents?.events?.length > 0 ? (
                         <div className="github-development-list">
-                          <h4>Branches</h4>
-                          {development.branches.map((branch) => (
+                          <h4>GitHub events</h4>
+                          {githubEvents.events.map((event) => (
                             <a
-                              href={branch.latest_commit_url}
+                              href={event.url || `https://github.com/${event.repo_owner}/${event.repo_name}`}
                               target="_blank"
                               rel="noreferrer"
-                              key={`${branch.repo_owner}/${branch.repo_name}/${branch.name}`}
+                              key={event.id}
                             >
-                              <strong>{branch.name}</strong>
-                              <span>{shortenSha(branch.latest_commit_sha)}</span>
+                              <strong>{getGitHubEventLabel(event)} · {getGitHubEventTitle(event)}</strong>
+                              <span>{getGitHubEventMeta(event)}</span>
                             </a>
                           ))}
                         </div>
-                      )}
-
-                      {development.pull_requests.length > 0 && (
-                        <div className="github-development-list">
-                          <h4>Pull requests</h4>
-                          {development.pull_requests.map((pullRequest) => (
-                            <a
-                              href={pullRequest.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              key={`${pullRequest.repo_owner}/${pullRequest.repo_name}/${pullRequest.number}`}
-                            >
-                              <strong>#{pullRequest.number} {pullRequest.title}</strong>
-                              <span>{pullRequest.merged ? "merged" : pullRequest.state}</span>
-                            </a>
-                          ))}
-                        </div>
-                      )}
-
-                      {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])].length > 0 && (
-                        <div className="github-development-list">
-                          <h4>Commits</h4>
-                          {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])]
-                            .slice(0, 6)
-                            .map((commit) => (
-                              <a href={commit.url} target="_blank" rel="noreferrer" key={`${commit.repo_owner}/${commit.repo_name}/${commit.sha}`}>
-                                <strong>{commit.message.split("\n")[0]}</strong>
-                                <span>{shortenSha(commit.sha)} · {commit.author_name ?? "Unknown author"}</span>
-                              </a>
-                            ))}
-                        </div>
+                      ) : (
+                        <p className="github-development-empty">No GitHub events yet.</p>
                       )}
                     </div>
                   ) : (

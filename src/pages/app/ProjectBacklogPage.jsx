@@ -19,7 +19,7 @@ import {
   createCard as createCardRequest,
   createEpic as createEpicRequest,
   createSprint as createSprintRequest,
-  getProjectDevelopment,
+  getProjectDevelopmentEvents,
   listEpicSprints,
   listArchivedProjectCards,
   listProjectCards,
@@ -338,7 +338,7 @@ function ProjectBacklogPage({
       setIsLoadingDevelopment(true);
       setEpicError("");
       try {
-        const developmentData = await getProjectDevelopment(project.id);
+        const developmentData = await getProjectDevelopmentEvents(project.id);
         if (isMounted) {
           setProjectDevelopment(developmentData);
         }

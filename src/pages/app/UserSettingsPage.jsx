@@ -1,9 +1,16 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { updateEmail, updateUsername, updateUserTheme } from "../../lib/api.js";
+import {
+  claimGitHubAppInstallation,
+  listGitHubAppInstallations,
+  updateEmail,
+  updateUsername,
+  updateUserTheme,
+} from "../../lib/api.js";
 
 const themeOptions = ["Light mode", "Dark mode", "System preference"];
 const themeStorageKey = "projectly-theme";
+const githubAppInstallUrl = import.meta.env.VITE_GITHUB_APP_INSTALL_URL ?? "";
 const themeLabels = {
   light: "Light mode",
   dark: "Dark mode",
@@ -37,9 +44,13 @@ function UserSettingsPage({ onUserUpdated, user }) {
   const [emailError, setEmailError] = useState("");
   const [themeMessage, setThemeMessage] = useState("");
   const [themeError, setThemeError] = useState("");
+  const [githubInstallations, setGithubInstallations] = useState([]);
+  const [githubMessage, setGithubMessage] = useState("");
+  const [githubError, setGithubError] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [isSavingEmail, setIsSavingEmail] = useState(false);
   const [isSavingTheme, setIsSavingTheme] = useState(false);
+  const [isLoadingGithub, setIsLoadingGithub] = useState(false);
   const [isThemeMenuOpen, setIsThemeMenuOpen] = useState(false);
   const themeMenuRef = useRef(null);
 
@@ -87,6 +98,66 @@ function UserSettingsPage({ onUserUpdated, user }) {
 
     return () => {
       document.removeEventListener("mousedown", closeThemeMenu);
+    };
+  }, []);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadGithubInstallations() {
+      setIsLoadingGithub(true);
+      setGithubError("");
+      try {
+        const installations = await listGitHubAppInstallations();
+        if (isMounted) {
+          setGithubInstallations(installations ?? []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGithubError(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGithub(false);
+        }
+      }
+    }
+
+    async function claimInstallationIfNeeded() {
+      const searchParams = new URLSearchParams(window.location.search);
+      const installationId = searchParams.get("github_installation_id");
+
+      if (!installationId) {
+        await loadGithubInstallations();
+        return;
+      }
+
+      setIsLoadingGithub(true);
+      setGithubMessage("");
+      setGithubError("");
+      try {
+        await claimGitHubAppInstallation(installationId);
+        const installations = await listGitHubAppInstallations();
+        if (isMounted) {
+          setGithubInstallations(installations ?? []);
+          setGithubMessage("GitHub connected.");
+          window.history.replaceState({}, "", "/settings");
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGithubError(error.message);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGithub(false);
+        }
+      }
+    }
+
+    claimInstallationIfNeeded();
+
+    return () => {
+      isMounted = false;
     };
   }, []);
 
@@ -149,6 +220,15 @@ function UserSettingsPage({ onUserUpdated, user }) {
     } finally {
       setIsSavingTheme(false);
     }
+  }
+
+  function connectGithubApp() {
+    if (!githubAppInstallUrl) {
+      setGithubError("GitHub App install URL is not configured.");
+      return;
+    }
+
+    window.location.href = githubAppInstallUrl;
   }
 
   return (
@@ -265,6 +345,45 @@ function UserSettingsPage({ onUserUpdated, user }) {
           </div>
           {themeMessage && <p className="member-form-message">{themeMessage}</p>}
           {themeError && <p className="app-error">{themeError}</p>}
+        </section>
+
+        <section className="settings-panel">
+          <h2>GitHub Integration</h2>
+          <p>Connect GitHub so Projectly can show repository, pull request, commit, and webhook event data.</p>
+
+          {isLoadingGithub ? (
+            <p>Checking GitHub connection...</p>
+          ) : githubInstallations.length > 0 ? (
+            <div className="github-installation-list">
+              {githubInstallations.map((installation) => (
+                <article className="github-installation-item" key={installation.id}>
+                  <div>
+                    <strong>{installation.account_login || "GitHub account"}</strong>
+                    <span>{installation.account_type || "GitHub App installation"}</span>
+                  </div>
+                  <span className="github-installation-status">Connected</span>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <div className="github-connect-settings">
+              <p>No GitHub App installation connected yet.</p>
+              {!githubAppInstallUrl && <p className="app-error">Missing VITE_GITHUB_APP_INSTALL_URL.</p>}
+            </div>
+          )}
+
+          {githubMessage && <p className="member-form-message">{githubMessage}</p>}
+          {githubError && <p className="app-error">{githubError}</p>}
+          <div className="settings-actions">
+            <button
+              className="settings-save-button"
+              type="button"
+              disabled={!githubAppInstallUrl || isLoadingGithub}
+              onClick={connectGithubApp}
+            >
+              {githubInstallations.length > 0 ? "Connect another GitHub account" : "Connect GitHub"}
+            </button>
+          </div>
         </section>
       </div>
     </section>

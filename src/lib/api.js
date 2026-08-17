@@ -527,6 +527,18 @@ export async function deleteCardGitHubLink(githubLinkId) {
   });
 }
 
+export async function listGitHubAppInstallations() {
+  const payload = await apiFetch("/github/app/installations");
+  return payload.data;
+}
+
+export async function claimGitHubAppInstallation(installationId) {
+  const payload = await apiFetch(`/github/app/installations/${installationId}/claim`, {
+    method: "POST",
+  });
+  return payload.data;
+}
+
 export async function listNotifications() {
   const payload = await apiFetch("/notifications");
   return payload.data;

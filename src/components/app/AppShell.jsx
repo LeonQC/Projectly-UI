@@ -142,7 +142,7 @@ function getRoutePage(pathname) {
     return { name: "inbox" };
   }
 
-  if (pathname === "/settings") {
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) {
     return { name: "user-settings" };
   }
 

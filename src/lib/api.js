@@ -500,8 +500,18 @@ export async function getProjectDevelopment(projectId) {
   return payload.data;
 }
 
+export async function getProjectDevelopmentEvents(projectId) {
+  const payload = await apiFetch(`/projects/${projectId}/development/events`);
+  return payload.data;
+}
+
 export async function getCardDevelopment(cardId) {
   const payload = await apiFetch(`/cards/${cardId}/development`);
+  return payload.data;
+}
+
+export async function getCardDevelopmentEvents(cardId) {
+  const payload = await apiFetch(`/cards/${cardId}/development/events`);
   return payload.data;
 }
 

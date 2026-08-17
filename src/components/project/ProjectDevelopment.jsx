@@ -4,19 +4,54 @@ function shortenSha(sha) {
   return sha ? sha.slice(0, 7) : "";
 }
 
-function RepoLabel({ link }) {
-  return (
-    <span>
-      {link.repo_owner}/{link.repo_name}
-    </span>
-  );
+function formatDateTime(value) {
+  if (!value) {
+    return "";
+  }
+
+  return new Intl.DateTimeFormat("en", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
+}
+
+function getEventTitle(event) {
+  if (event.title) {
+    return event.title;
+  }
+
+  if (event.message) {
+    return event.message.split("\n")[0];
+  }
+
+  return event.event_type === "pull_request" ? "Pull request event" : "GitHub event";
+}
+
+function getEventLabel(event) {
+  if (event.event_type === "pull_request") {
+    return event.action ? `Pull request ${event.action}` : "Pull request";
+  }
+
+  if (event.event_type === "push") {
+    return "Push";
+  }
+
+  return event.event_type.replaceAll("_", " ");
+}
+
+function getEventMeta(event) {
+  return [
+    event.repo_owner && event.repo_name ? `${event.repo_owner}/${event.repo_name}` : "",
+    event.branch_name ? `branch ${event.branch_name}` : "",
+    event.pull_request_number ? `pull request #${event.pull_request_number}` : "",
+    event.commit_sha ? `commit ${shortenSha(event.commit_sha)}` : "",
+    event.sender_login ? `by ${event.sender_login}` : "",
+    formatDateTime(event.created_at),
+  ].filter(Boolean).join(" · ");
 }
 
 function ProjectDevelopmentCard({ item, onOpenCard }) {
-  const { card, development } = item;
-  const links = development.github_links ?? [];
-  const commits = [...(development.linked_commits ?? []), ...(development.recent_commits ?? [])].slice(0, 4);
-  const hasDevelopment = development.development_status?.has_github_links;
+  const { card, events = [] } = item;
 
   return (
     <article className="project-development-card">
@@ -27,67 +62,30 @@ function ProjectDevelopmentCard({ item, onOpenCard }) {
         <span>{card.status.replaceAll("_", " ")}</span>
       </header>
 
-      {hasDevelopment ? (
-        <div className="project-development-content">
-          <div className="project-development-summary">
-            <span>{development.development_status.link_count} links</span>
-            <span>{development.development_status.branch_count} branches</span>
-            <span>{development.development_status.pull_request_count} PRs</span>
-            <span>{development.development_status.commit_count} commits</span>
-          </div>
+      <div className="project-development-content">
+        <div className="project-development-summary">
+          <span>{events.length} events</span>
+        </div>
 
-          <div className="project-development-links">
-            {links.map((link) => (
+        {events.length > 0 ? (
+          <div className="project-development-list">
+            <h3>GitHub events</h3>
+            {events.map((event) => (
               <a
-                href={link.url || `https://github.com/${link.repo_owner}/${link.repo_name}`}
+                href={event.url || `https://github.com/${event.repo_owner}/${event.repo_name}`}
                 target="_blank"
                 rel="noreferrer"
-                key={link.id}
+                key={event.id}
               >
-                <strong><RepoLabel link={link} /></strong>
-                <span>
-                  {[
-                    link.branch_name ? `branch ${link.branch_name}` : "",
-                    link.pull_request_number ? `PR #${link.pull_request_number}` : "",
-                    link.commit_sha ? `commit ${shortenSha(link.commit_sha)}` : "",
-                  ].filter(Boolean).join(" · ") || "Repository link"}
-                </span>
+                <strong>{getEventLabel(event)} · {getEventTitle(event)}</strong>
+                <span>{getEventMeta(event)}</span>
               </a>
             ))}
           </div>
-
-          {development.pull_requests.length > 0 && (
-            <div className="project-development-list">
-              <h3>Pull requests</h3>
-              {development.pull_requests.map((pullRequest) => (
-                <a
-                  href={pullRequest.url}
-                  target="_blank"
-                  rel="noreferrer"
-                  key={`${pullRequest.repo_owner}/${pullRequest.repo_name}/${pullRequest.number}`}
-                >
-                  <strong>#{pullRequest.number} {pullRequest.title}</strong>
-                  <span>{pullRequest.merged ? "merged" : pullRequest.state}</span>
-                </a>
-              ))}
-            </div>
-          )}
-
-          {commits.length > 0 && (
-            <div className="project-development-list">
-              <h3>Recent commits</h3>
-              {commits.map((commit) => (
-                <a href={commit.url} target="_blank" rel="noreferrer" key={`${commit.repo_owner}/${commit.repo_name}/${commit.sha}`}>
-                  <strong>{commit.message.split("\n")[0]}</strong>
-                  <span>{shortenSha(commit.sha)} · {commit.author_name ?? "Unknown author"}</span>
-                </a>
-              ))}
-            </div>
-          )}
-        </div>
-      ) : (
-        <p className="project-development-empty">No development links for this card.</p>
-      )}
+        ) : (
+          <p className="project-development-empty">No GitHub events for this card yet.</p>
+        )}
+      </div>
     </article>
   );
 }
@@ -98,7 +96,7 @@ function ProjectDevelopment({ development, isLoading, onOpenCard }) {
   if (isLoading) {
     return (
       <div className="project-development-page">
-        <p className="empty-state">Loading development...</p>
+        <p className="empty-state">Loading GitHub events...</p>
       </div>
     );
   }
@@ -110,7 +108,7 @@ function ProjectDevelopment({ development, isLoading, onOpenCard }) {
           <ProjectDevelopmentCard item={item} onOpenCard={onOpenCard} key={item.card.id} />
         ))
       ) : (
-        <p className="empty-state">No cards in this project yet.</p>
+        <p className="empty-state">No GitHub events for this project yet.</p>
       )}
     </div>
   );

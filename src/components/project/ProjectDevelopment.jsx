@@ -45,6 +45,7 @@ function getEventMeta(event) {
     event.branch_name ? `branch ${event.branch_name}` : "",
     event.pull_request_number ? `pull request #${event.pull_request_number}` : "",
     event.commit_sha ? `commit ${shortenSha(event.commit_sha)}` : "",
+    event.card_id ? `matched card #${event.card_id}` : "",
     event.sender_login ? `by ${event.sender_login}` : "",
     formatDateTime(event.created_at),
   ].filter(Boolean).join(" · ");

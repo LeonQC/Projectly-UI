@@ -2,24 +2,20 @@ import React, { useEffect, useRef, useState } from "react";
 import {
   createCardAttachment,
   createCardComment,
-  createCardGitHubLink,
   createCardLabel,
   createCardLink,
   createCardMember,
   deleteCardAttachment,
   deleteCardComment,
-  deleteCardGitHubLink,
   deleteCardLabel,
   deleteCardLink,
   deleteCardMember,
-  getCardDevelopment,
   getCardDevelopmentEvents,
   getCardDetail,
   listGitHubAppInstallations,
   listCommentMentionUsers,
   listProjectMembers,
   updateCardComment,
-  updateCardGitHubLink,
 } from "../../lib/api.js";
 
 const defaultCardStatuses = [
@@ -236,17 +232,10 @@ function CardDetailModal({
   const [commentText, setCommentText] = useState("");
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [comments, setComments] = useState([]);
-  const [development, setDevelopment] = useState(null);
   const [githubEvents, setGithubEvents] = useState(null);
   const [githubInstallations, setGithubInstallations] = useState([]);
   const [isLoadingGithubInstallations, setIsLoadingGithubInstallations] = useState(false);
   const [githubInstallationError, setGithubInstallationError] = useState("");
-  const [githubRepo, setGithubRepo] = useState("");
-  const [githubBranch, setGithubBranch] = useState("");
-  const [githubPullRequest, setGithubPullRequest] = useState("");
-  const [githubCommit, setGithubCommit] = useState("");
-  const [githubUrl, setGithubUrl] = useState("");
-  const [editingGitHubLinkId, setEditingGitHubLinkId] = useState(null);
   const [editingCommentId, setEditingCommentId] = useState(null);
   const [editingCommentText, setEditingCommentText] = useState("");
   const [isMentionMenuOpen, setIsMentionMenuOpen] = useState(false);
@@ -340,93 +329,6 @@ function CardDetailModal({
       ]);
       setLinkedCardId("");
       setLinkedRelation(workItemRelations[0]);
-    } catch (error) {
-      setDetailError(error.message);
-    } finally {
-      setIsSavingDetail(false);
-    }
-  }
-
-  function resetGitHubLinkForm() {
-    setGithubRepo("");
-    setGithubBranch("");
-    setGithubPullRequest("");
-    setGithubCommit("");
-    setGithubUrl("");
-    setEditingGitHubLinkId(null);
-  }
-
-  function editGitHubLink(link) {
-    setDetailError("");
-    setGithubRepo(`${link.repo_owner}/${link.repo_name}`);
-    setGithubBranch(link.branch_name ?? "");
-    setGithubPullRequest(link.pull_request_number ? String(link.pull_request_number) : "");
-    setGithubCommit(link.commit_sha ?? "");
-    setGithubUrl(link.url ?? "");
-    setEditingGitHubLinkId(link.id);
-  }
-
-  async function refreshDevelopment() {
-    const [developmentData, eventsData] = await Promise.all([
-      getCardDevelopment(card.id),
-      getCardDevelopmentEvents(card.id),
-    ]);
-    setDevelopment(developmentData);
-    setGithubEvents(eventsData);
-  }
-
-  async function saveGitHubLink(event) {
-    event.preventDefault();
-
-    const normalizedRepo = githubRepo.trim().replace(/^https:\/\/github\.com\//, "").replace(/\/$/, "");
-    const [repoOwner, repoName] = normalizedRepo.split("/");
-
-    if (!repoOwner || !repoName) {
-      setDetailError("GitHub repo must use owner/repo format");
-      return;
-    }
-
-    if (!githubUrl.trim()) {
-      setDetailError("GitHub URL is required");
-      return;
-    }
-
-    setDetailError("");
-    setIsSavingDetail(true);
-    try {
-      const payload = {
-        repo_owner: repoOwner,
-        repo_name: repoName,
-        branch_name: githubBranch.trim() || null,
-        pull_request_number: githubPullRequest ? Number(githubPullRequest) : null,
-        commit_sha: githubCommit.trim() || null,
-        url: githubUrl.trim() || null,
-      };
-
-      if (editingGitHubLinkId) {
-        await updateCardGitHubLink(editingGitHubLinkId, payload);
-      } else {
-        await createCardGitHubLink(card.id, payload);
-      }
-
-      await refreshDevelopment();
-      resetGitHubLinkForm();
-    } catch (error) {
-      setDetailError(error.message);
-    } finally {
-      setIsSavingDetail(false);
-    }
-  }
-
-  async function removeGitHubLink(githubLinkId) {
-    setDetailError("");
-    setIsSavingDetail(true);
-    try {
-      await deleteCardGitHubLink(githubLinkId);
-      await refreshDevelopment();
-      if (editingGitHubLinkId === githubLinkId) {
-        resetGitHubLinkForm();
-      }
     } catch (error) {
       setDetailError(error.message);
     } finally {
@@ -761,13 +663,11 @@ function CardDetailModal({
       setComments([]);
       setLinkedWorkItems([]);
       setMentionUsers([]);
-      setDevelopment(null);
       setGithubEvents(null);
 
       try {
-        const [detail, developmentData, eventsData] = await Promise.all([
+        const [detail, eventsData] = await Promise.all([
           getCardDetail(card.id),
-          getCardDevelopment(card.id),
           getCardDevelopmentEvents(card.id),
         ]);
 
@@ -803,7 +703,6 @@ function CardDetailModal({
         setCardAttachments((detail.attachments ?? []).map(mapDetailAttachment));
         setComments((detail.comments ?? []).map((comment) => mapDetailComment(comment, mappedProjectMembers)));
         setLinkedWorkItems((detail.links ?? []).map((link) => mapDetailLink(link, card.id)));
-        setDevelopment(developmentData);
         setGithubEvents(eventsData);
       } catch (error) {
         if (isMounted) {
@@ -1305,142 +1204,30 @@ function CardDetailModal({
                     <span>Connected GitHub</span>
                     <strong>{connectedGithubLabel || "GitHub App"}</strong>
                   </div>
-                  <form className="github-link-form" onSubmit={saveGitHubLink}>
-                    <label>
-                      <span className="field-label-text">
-                        Repository <span className="required-mark">*</span>
-                      </span>
-                      <input
-                        type="text"
-                        placeholder="owner/repo"
-                        required
-                        value={githubRepo}
-                        onChange={(event) => setGithubRepo(event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Branch
-                      <input
-                        type="text"
-                        placeholder="main"
-                        value={githubBranch}
-                        onChange={(event) => setGithubBranch(event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Pull Request
-                      <input
-                        type="number"
-                        min="1"
-                        placeholder="12"
-                        value={githubPullRequest}
-                        onChange={(event) => setGithubPullRequest(event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Commit
-                      <input
-                        type="text"
-                        placeholder="commit sha"
-                        value={githubCommit}
-                        onChange={(event) => setGithubCommit(event.target.value)}
-                      />
-                    </label>
-                    <label className="github-link-url-field">
-                      <span className="field-label-text">
-                        URL <span className="required-mark">*</span>
-                      </span>
-                      <input
-                        type="url"
-                        placeholder="https://github.com/owner/repo"
-                        required
-                        value={githubUrl}
-                        onChange={(event) => setGithubUrl(event.target.value)}
-                      />
-                    </label>
-                    <button
-                      className="small-action-button"
-                      type="submit"
-                      disabled={!githubRepo.trim() || !githubUrl.trim() || isSavingDetail}
-                    >
-                      {editingGitHubLinkId ? "Save GitHub Link" : "Link GitHub"}
-                    </button>
-                    {editingGitHubLinkId && (
-                      <button
-                        className="small-action-button"
-                        type="button"
-                        disabled={isSavingDetail}
-                        onClick={resetGitHubLinkForm}
-                      >
-                        Cancel Edit
-                      </button>
-                    )}
-                  </form>
+                  <div className="github-development-panel">
+                    <div className="github-development-summary">
+                      <span>{githubEvents?.events?.length ?? 0} events</span>
+                    </div>
 
-                  {development?.development_status?.has_github_links ? (
-                    <div className="github-development-panel">
-                      <div className="github-development-summary">
-                        <span>{development.development_status.link_count} links</span>
-                        <span>{githubEvents?.events?.length ?? 0} events</span>
-                      </div>
-
-                      <div className="github-link-list">
-                        {development.github_links.map((link) => (
-                          <article className="github-link-item" key={link.id}>
-                            <div>
-                              <strong>{link.repo_owner}/{link.repo_name}</strong>
-                              <span>
-                                {[
-                                  link.branch_name ? `branch ${link.branch_name}` : "",
-                                  link.pull_request_number ? `pull request #${link.pull_request_number}` : "",
-                                  link.commit_sha ? `commit ${shortenSha(link.commit_sha)}` : "",
-                                ].filter(Boolean).join(" · ") || "Repository link"}
-                              </span>
-                            </div>
-                            <div className="github-link-actions">
-                              <button
-                                className="small-action-button"
-                                type="button"
-                                disabled={isSavingDetail}
-                                onClick={() => editGitHubLink(link)}
-                              >
-                                Edit
-                              </button>
-                              <button
-                                className="small-action-button"
-                                type="button"
-                                disabled={isSavingDetail}
-                                onClick={() => removeGitHubLink(link.id)}
-                              >
-                                Remove
-                              </button>
-                            </div>
-                          </article>
+                    {githubEvents?.events?.length > 0 ? (
+                      <div className="github-development-list">
+                        <h4>GitHub events</h4>
+                        {githubEvents.events.map((event) => (
+                          <a
+                            href={event.url || `https://github.com/${event.repo_owner}/${event.repo_name}`}
+                            target="_blank"
+                            rel="noreferrer"
+                            key={event.id}
+                          >
+                            <strong>{getGitHubEventLabel(event)} · {getGitHubEventTitle(event)}</strong>
+                            <span>{getGitHubEventMeta(event)}</span>
+                          </a>
                         ))}
                       </div>
-
-                      {githubEvents?.events?.length > 0 ? (
-                        <div className="github-development-list">
-                          <h4>GitHub events</h4>
-                          {githubEvents.events.map((event) => (
-                            <a
-                              href={event.url || `https://github.com/${event.repo_owner}/${event.repo_name}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              key={event.id}
-                            >
-                              <strong>{getGitHubEventLabel(event)} · {getGitHubEventTitle(event)}</strong>
-                              <span>{getGitHubEventMeta(event)}</span>
-                            </a>
-                          ))}
-                        </div>
-                      ) : (
-                        <p className="github-development-empty">No GitHub events yet.</p>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="github-development-empty">No GitHub links yet.</p>
-                  )}
+                    ) : (
+                      <p className="github-development-empty">No GitHub events yet.</p>
+                    )}
+                  </div>
                 </>
               )}
             </section>

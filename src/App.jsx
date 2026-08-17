@@ -16,13 +16,14 @@ import RegisterPage from "./pages/auth/RegisterPage.jsx";
 const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID ?? "";
 
 function App() {
-  const [page, setPage] = useState(() => (getAuthToken() ? "app" : "login"));
+  const [page, setPage] = useState(() => (getAuthToken() ? "checking" : "login"));
   const [currentUser, setCurrentUser] = useState(null);
   const [authError, setAuthError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!getAuthToken()) {
+      setPage("login");
       return;
     }
 
@@ -120,7 +121,41 @@ function App() {
   }
 
   if (page === "app") {
+    if (!currentUser) {
+      return (
+        <main className="auth-shell">
+          <section className="auth-panel">
+            <div className="brand-lockup">
+              <span className="brand-mark">P</span>
+              <span>Projectly</span>
+            </div>
+            <div className="auth-heading">
+              <h1>Checking session</h1>
+              <p>Loading your account...</p>
+            </div>
+          </section>
+        </main>
+      );
+    }
+
     return <AppShell currentUser={currentUser} onLogout={logout} onUserUpdated={setCurrentUser} />;
+  }
+
+  if (page === "checking") {
+    return (
+      <main className="auth-shell">
+        <section className="auth-panel">
+          <div className="brand-lockup">
+            <span className="brand-mark">P</span>
+            <span>Projectly</span>
+          </div>
+          <div className="auth-heading">
+            <h1>Checking session</h1>
+            <p>Loading your account...</p>
+          </div>
+        </section>
+      </main>
+    );
   }
 
   return (

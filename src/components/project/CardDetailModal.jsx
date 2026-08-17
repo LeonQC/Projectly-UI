@@ -14,6 +14,7 @@ import {
   deleteCardMember,
   getCardDevelopment,
   getCardDetail,
+  listGitHubAppInstallations,
   listCommentMentionUsers,
   listProjectMembers,
   updateCardComment,
@@ -35,6 +36,7 @@ const workItemRelations = [
   "duplicates",
   "relates to",
 ];
+const githubAppInstallUrl = import.meta.env.VITE_GITHUB_APP_INSTALL_URL ?? "";
 const labelColors = [
   { name: "Purple", value: "purple" },
   { name: "Green", value: "green" },
@@ -199,6 +201,9 @@ function CardDetailModal({
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [comments, setComments] = useState([]);
   const [development, setDevelopment] = useState(null);
+  const [githubInstallations, setGithubInstallations] = useState([]);
+  const [isLoadingGithubInstallations, setIsLoadingGithubInstallations] = useState(false);
+  const [githubInstallationError, setGithubInstallationError] = useState("");
   const [githubRepo, setGithubRepo] = useState("");
   const [githubBranch, setGithubBranch] = useState("");
   const [githubPullRequest, setGithubPullRequest] = useState("");
@@ -263,6 +268,20 @@ function CardDetailModal({
       (linkedItem) =>
         linkedItem.cardId === selectedLinkedCard.id && linkedItem.relation === linkedRelation
     );
+  const hasConnectedGithub = githubInstallations.length > 0;
+  const connectedGithubLabel = githubInstallations
+    .map((installation) => installation.account_login)
+    .filter(Boolean)
+    .join(", ");
+
+  function connectGithubApp() {
+    if (!githubAppInstallUrl) {
+      setGithubInstallationError("GitHub App install URL is not configured.");
+      return;
+    }
+
+    window.location.href = githubAppInstallUrl;
+  }
 
   async function addLinkedWorkItem(event) {
     event.preventDefault();
@@ -758,6 +777,36 @@ function CardDetailModal({
   }, [card.id]);
 
   useEffect(() => {
+    let isMounted = true;
+
+    async function loadGithubInstallations() {
+      setGithubInstallationError("");
+      setIsLoadingGithubInstallations(true);
+      try {
+        const installations = await listGitHubAppInstallations();
+        if (isMounted) {
+          setGithubInstallations(installations ?? []);
+        }
+      } catch (error) {
+        if (isMounted) {
+          setGithubInstallationError(error.message);
+          setGithubInstallations([]);
+        }
+      } finally {
+        if (isMounted) {
+          setIsLoadingGithubInstallations(false);
+        }
+      }
+    }
+
+    loadGithubInstallations();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [card.id]);
+
+  useEffect(() => {
     function closeDropdownsOnOutsideClick(event) {
       if (cardMenuRef.current && !cardMenuRef.current.contains(event.target)) {
         setIsMenuOpen(false);
@@ -1180,172 +1229,203 @@ function CardDetailModal({
               <header>
                 <h3>Development</h3>
               </header>
-              <form className="github-link-form" onSubmit={saveGitHubLink}>
-                <label>
-                  <span className="field-label-text">
-                    Repository <span className="required-mark">*</span>
-                  </span>
-                  <input
-                    type="text"
-                    placeholder="owner/repo"
-	            required
-	            value={githubRepo}
-	            onChange={(event) => setGithubRepo(event.target.value)}
-	          />
-                </label>
-                <label>
-                  Branch
-                  <input
-                    type="text"
-                    placeholder="main"
-                    value={githubBranch}
-                    onChange={(event) => setGithubBranch(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Pull Request
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="12"
-                    value={githubPullRequest}
-                    onChange={(event) => setGithubPullRequest(event.target.value)}
-                  />
-                </label>
-                <label>
-                  Commit
-                  <input
-                    type="text"
-                    placeholder="commit sha"
-                    value={githubCommit}
-                    onChange={(event) => setGithubCommit(event.target.value)}
-                  />
-                </label>
-                <label className="github-link-url-field">
-                  <span className="field-label-text">
-                    URL <span className="required-mark">*</span>
-                  </span>
-                  <input
-                    type="url"
-                    placeholder="https://github.com/owner/repo"
-	            required
-	            value={githubUrl}
-	            onChange={(event) => setGithubUrl(event.target.value)}
-	          />
-	        </label>
-	        <button
-	          className="small-action-button"
-	          type="submit"
-	          disabled={!githubRepo.trim() || !githubUrl.trim() || isSavingDetail}
-	        >
-                  {editingGitHubLinkId ? "Save GitHub Link" : "Link GitHub"}
-                </button>
-                {editingGitHubLinkId && (
+              {isLoadingGithubInstallations ? (
+                <div className="github-connect-panel">
+                  <h4>Checking GitHub connection...</h4>
+                </div>
+              ) : !hasConnectedGithub ? (
+                <div className="github-connect-panel">
+                  <div>
+                    <h4>Connect GitHub</h4>
+                    <p>Connect a GitHub App installation before linking repositories, branches, pull requests, commits, and events.</p>
+                  </div>
+                  {githubInstallationError && <p className="app-error">{githubInstallationError}</p>}
+                  {!githubAppInstallUrl && (
+                    <p className="app-error">Missing VITE_GITHUB_APP_INSTALL_URL.</p>
+                  )}
                   <button
-                    className="small-action-button"
+                    className="settings-save-button"
                     type="button"
-                    disabled={isSavingDetail}
-                    onClick={resetGitHubLinkForm}
+                    disabled={!githubAppInstallUrl}
+                    onClick={connectGithubApp}
                   >
-                    Cancel Edit
+                    Connect GitHub
                   </button>
-                )}
-              </form>
-
-              {development?.development_status?.has_github_links ? (
-                <div className="github-development-panel">
-                  <div className="github-development-summary">
-                    <span>{development.development_status.link_count} links</span>
-                    <span>{development.development_status.branch_count} branches</span>
-                    <span>{development.development_status.pull_request_count} pull requests</span>
-                    <span>{development.development_status.commit_count} commits</span>
-                  </div>
-
-                  <div className="github-link-list">
-                    {development.github_links.map((link) => (
-                      <article className="github-link-item" key={link.id}>
-                        <div>
-                          <strong>{link.repo_owner}/{link.repo_name}</strong>
-                          <span>
-                            {[
-                              link.branch_name ? `branch ${link.branch_name}` : "",
-                              link.pull_request_number ? `pull request #${link.pull_request_number}` : "",
-                              link.commit_sha ? `commit ${shortenSha(link.commit_sha)}` : "",
-                            ].filter(Boolean).join(" · ") || "Repository link"}
-                          </span>
-                        </div>
-                        <div className="github-link-actions">
-                          <button
-                            className="small-action-button"
-                            type="button"
-                            disabled={isSavingDetail}
-                            onClick={() => editGitHubLink(link)}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            className="small-action-button"
-                            type="button"
-                            disabled={isSavingDetail}
-                            onClick={() => removeGitHubLink(link.id)}
-                          >
-                            Remove
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                  </div>
-
-                  {development.branches.length > 0 && (
-                    <div className="github-development-list">
-                      <h4>Branches</h4>
-                      {development.branches.map((branch) => (
-                        <a
-                          href={branch.latest_commit_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          key={`${branch.repo_owner}/${branch.repo_name}/${branch.name}`}
-                        >
-                          <strong>{branch.name}</strong>
-                          <span>{shortenSha(branch.latest_commit_sha)}</span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-
-                  {development.pull_requests.length > 0 && (
-                    <div className="github-development-list">
-                      <h4>Pull requests</h4>
-                      {development.pull_requests.map((pullRequest) => (
-                        <a
-                          href={pullRequest.url}
-                          target="_blank"
-                          rel="noreferrer"
-                          key={`${pullRequest.repo_owner}/${pullRequest.repo_name}/${pullRequest.number}`}
-                        >
-                          <strong>#{pullRequest.number} {pullRequest.title}</strong>
-                          <span>{pullRequest.merged ? "merged" : pullRequest.state}</span>
-                        </a>
-                      ))}
-                    </div>
-                  )}
-
-                  {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])].length > 0 && (
-                    <div className="github-development-list">
-                      <h4>Commits</h4>
-                      {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])]
-                        .slice(0, 6)
-                        .map((commit) => (
-                          <a href={commit.url} target="_blank" rel="noreferrer" key={`${commit.repo_owner}/${commit.repo_name}/${commit.sha}`}>
-                            <strong>{commit.message.split("\n")[0]}</strong>
-                            <span>{shortenSha(commit.sha)} · {commit.author_name ?? "Unknown author"}</span>
-                          </a>
-                        ))}
-                    </div>
-                  )}
                 </div>
               ) : (
-                <p className="github-development-empty">No GitHub links yet.</p>
+                <>
+                  <div className="github-connected-banner">
+                    <span>Connected GitHub</span>
+                    <strong>{connectedGithubLabel || "GitHub App"}</strong>
+                  </div>
+                  <form className="github-link-form" onSubmit={saveGitHubLink}>
+                    <label>
+                      <span className="field-label-text">
+                        Repository <span className="required-mark">*</span>
+                      </span>
+                      <input
+                        type="text"
+                        placeholder="owner/repo"
+                        required
+                        value={githubRepo}
+                        onChange={(event) => setGithubRepo(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Branch
+                      <input
+                        type="text"
+                        placeholder="main"
+                        value={githubBranch}
+                        onChange={(event) => setGithubBranch(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Pull Request
+                      <input
+                        type="number"
+                        min="1"
+                        placeholder="12"
+                        value={githubPullRequest}
+                        onChange={(event) => setGithubPullRequest(event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Commit
+                      <input
+                        type="text"
+                        placeholder="commit sha"
+                        value={githubCommit}
+                        onChange={(event) => setGithubCommit(event.target.value)}
+                      />
+                    </label>
+                    <label className="github-link-url-field">
+                      <span className="field-label-text">
+                        URL <span className="required-mark">*</span>
+                      </span>
+                      <input
+                        type="url"
+                        placeholder="https://github.com/owner/repo"
+                        required
+                        value={githubUrl}
+                        onChange={(event) => setGithubUrl(event.target.value)}
+                      />
+                    </label>
+                    <button
+                      className="small-action-button"
+                      type="submit"
+                      disabled={!githubRepo.trim() || !githubUrl.trim() || isSavingDetail}
+                    >
+                      {editingGitHubLinkId ? "Save GitHub Link" : "Link GitHub"}
+                    </button>
+                    {editingGitHubLinkId && (
+                      <button
+                        className="small-action-button"
+                        type="button"
+                        disabled={isSavingDetail}
+                        onClick={resetGitHubLinkForm}
+                      >
+                        Cancel Edit
+                      </button>
+                    )}
+                  </form>
+
+                  {development?.development_status?.has_github_links ? (
+                    <div className="github-development-panel">
+                      <div className="github-development-summary">
+                        <span>{development.development_status.link_count} links</span>
+                        <span>{development.development_status.branch_count} branches</span>
+                        <span>{development.development_status.pull_request_count} pull requests</span>
+                        <span>{development.development_status.commit_count} commits</span>
+                      </div>
+
+                      <div className="github-link-list">
+                        {development.github_links.map((link) => (
+                          <article className="github-link-item" key={link.id}>
+                            <div>
+                              <strong>{link.repo_owner}/{link.repo_name}</strong>
+                              <span>
+                                {[
+                                  link.branch_name ? `branch ${link.branch_name}` : "",
+                                  link.pull_request_number ? `pull request #${link.pull_request_number}` : "",
+                                  link.commit_sha ? `commit ${shortenSha(link.commit_sha)}` : "",
+                                ].filter(Boolean).join(" · ") || "Repository link"}
+                              </span>
+                            </div>
+                            <div className="github-link-actions">
+                              <button
+                                className="small-action-button"
+                                type="button"
+                                disabled={isSavingDetail}
+                                onClick={() => editGitHubLink(link)}
+                              >
+                                Edit
+                              </button>
+                              <button
+                                className="small-action-button"
+                                type="button"
+                                disabled={isSavingDetail}
+                                onClick={() => removeGitHubLink(link.id)}
+                              >
+                                Remove
+                              </button>
+                            </div>
+                          </article>
+                        ))}
+                      </div>
+
+                      {development.branches.length > 0 && (
+                        <div className="github-development-list">
+                          <h4>Branches</h4>
+                          {development.branches.map((branch) => (
+                            <a
+                              href={branch.latest_commit_url}
+                              target="_blank"
+                              rel="noreferrer"
+                              key={`${branch.repo_owner}/${branch.repo_name}/${branch.name}`}
+                            >
+                              <strong>{branch.name}</strong>
+                              <span>{shortenSha(branch.latest_commit_sha)}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      {development.pull_requests.length > 0 && (
+                        <div className="github-development-list">
+                          <h4>Pull requests</h4>
+                          {development.pull_requests.map((pullRequest) => (
+                            <a
+                              href={pullRequest.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              key={`${pullRequest.repo_owner}/${pullRequest.repo_name}/${pullRequest.number}`}
+                            >
+                              <strong>#{pullRequest.number} {pullRequest.title}</strong>
+                              <span>{pullRequest.merged ? "merged" : pullRequest.state}</span>
+                            </a>
+                          ))}
+                        </div>
+                      )}
+
+                      {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])].length > 0 && (
+                        <div className="github-development-list">
+                          <h4>Commits</h4>
+                          {[...(development.linked_commits ?? []), ...(development.recent_commits ?? [])]
+                            .slice(0, 6)
+                            .map((commit) => (
+                              <a href={commit.url} target="_blank" rel="noreferrer" key={`${commit.repo_owner}/${commit.repo_name}/${commit.sha}`}>
+                                <strong>{commit.message.split("\n")[0]}</strong>
+                                <span>{shortenSha(commit.sha)} · {commit.author_name ?? "Unknown author"}</span>
+                              </a>
+                            ))}
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="github-development-empty">No GitHub links yet.</p>
+                  )}
+                </>
               )}
             </section>
           </section>

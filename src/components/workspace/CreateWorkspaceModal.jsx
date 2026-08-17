@@ -2,16 +2,26 @@ import React, { useState } from "react";
 
 function CreateWorkspaceModal({ onClose, onCreate }) {
   const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  function submitWorkspace(event) {
+  async function submitWorkspace(event) {
     event.preventDefault();
 
     if (!name.trim()) {
       return;
     }
 
-    onCreate({ name: name.trim() });
-    onClose();
+    setError("");
+    setIsSubmitting(true);
+    try {
+      await onCreate({ name: name.trim() });
+      onClose();
+    } catch (createError) {
+      setError(createError.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -39,11 +49,13 @@ function CreateWorkspaceModal({ onClose, onCreate }) {
             />
           </label>
 
+          {error && <p className="app-error">{error}</p>}
+
           <footer className="sprint-modal-footer">
-            <button className="modal-cancel-button" type="button" onClick={onClose}>
+            <button className="modal-cancel-button" type="button" disabled={isSubmitting} onClick={onClose}>
               Cancel
             </button>
-            <button className="modal-update-button" type="submit">
+            <button className="modal-update-button" type="submit" disabled={isSubmitting}>
               Create
             </button>
           </footer>

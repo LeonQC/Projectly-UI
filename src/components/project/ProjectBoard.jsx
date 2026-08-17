@@ -47,7 +47,10 @@ export function WorkItemCard({
     >
       <label className="work-item-check">
         <input type="checkbox" defaultChecked={card.completed} />
-        <span>{card.title}</span>
+        <span className="work-item-text">
+          {card.displayId && <small className="card-display-id">{card.displayId}</small>}
+          <span>{card.title}</span>
+        </span>
       </label>
       <div className="work-item-actions">
         {!hideStatus && (

@@ -44,12 +44,15 @@ function CreateWorkspaceModal({ onClose, onCreate }) {
             <input
               type="text"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              aria-invalid={Boolean(error)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setError("");
+              }}
               autoFocus
             />
+            {error && <span className="modal-field-error">{error}</span>}
           </label>
-
-          {error && <p className="app-error">{error}</p>}
 
           <footer className="sprint-modal-footer">
             <button className="modal-cancel-button" type="button" disabled={isSubmitting} onClick={onClose}>

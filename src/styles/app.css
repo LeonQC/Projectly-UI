@@ -2346,6 +2346,13 @@ body.is-resizing-sidebar {
   font-weight: 600;
 }
 
+.modal-field-error {
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+}
+
 .modal-field-full {
   max-width: none;
 }
@@ -2452,11 +2459,17 @@ body.is-resizing-sidebar {
 
 .card-detail-header {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 18px;
   border-bottom: 1px solid #dfe1e6;
   padding: 16px 20px 10px;
+}
+
+.card-detail-header-content {
+  display: grid;
+  min-width: 0;
+  gap: 10px;
 }
 
 .card-detail-meta {
@@ -2467,8 +2480,7 @@ body.is-resizing-sidebar {
 }
 
 .card-detail-display-id {
-  flex: 0 1 260px;
-  max-width: 260px;
+  max-width: 560px;
 }
 
 .card-list-field,

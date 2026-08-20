@@ -793,100 +793,102 @@ function CardDetailModal({
     <div className="modal-backdrop" role="presentation">
       <section className="card-detail-modal" aria-labelledby="card-detail-title" role="dialog" aria-modal="true">
         <header className="card-detail-header">
-          <div className="card-detail-meta">
+          <div className="card-detail-header-content">
             {displayCard.displayId && (
               <span className="card-display-id card-detail-display-id">{displayCard.displayId}</span>
             )}
-            <div className="card-status-field" ref={statusMenuRef}>
-              <span>Status</span>
-              <button
-                className="card-status-select"
-                type="button"
-                aria-expanded={isStatusMenuOpen}
-                onClick={() => setIsStatusMenuOpen((isOpen) => !isOpen)}
-              >
-                {statuses.find((status) => status.value === displayCard.status)?.label ?? "Todo"}
-                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                  <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                </svg>
-              </button>
-              {isStatusMenuOpen && (
-                <div className="card-status-dropdown card-detail-status-dropdown" role="menu">
-                  {statuses.map((status) => (
+            <div className="card-detail-meta">
+              <div className="card-status-field" ref={statusMenuRef}>
+                <span>Status</span>
+                <button
+                  className="card-status-select"
+                  type="button"
+                  aria-expanded={isStatusMenuOpen}
+                  onClick={() => setIsStatusMenuOpen((isOpen) => !isOpen)}
+                >
+                  {statuses.find((status) => status.value === displayCard.status)?.label ?? "Todo"}
+                  <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                    <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                  </svg>
+                </button>
+                {isStatusMenuOpen && (
+                  <div className="card-status-dropdown card-detail-status-dropdown" role="menu">
+                    {statuses.map((status) => (
+                      <button
+                        className={displayCard.status === status.value ? "is-active" : ""}
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          onStatusChange?.(card.id, status.value);
+                          setIsStatusMenuOpen(false);
+                        }}
+                        key={status.value}
+                      >
+                        {status.label}
+                      </button>
+                    ))}
                     <button
-                      className={displayCard.status === status.value ? "is-active" : ""}
+                      className="create-status-menu-item"
                       type="button"
                       role="menuitem"
                       onClick={() => {
-                        onStatusChange?.(card.id, status.value);
                         setIsStatusMenuOpen(false);
+                        setIsStatusModalOpen(true);
                       }}
-                      key={status.value}
                     >
-                      {status.label}
+                      Create new status
                     </button>
-                  ))}
-                  <button
-                    className="create-status-menu-item"
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setIsStatusMenuOpen(false);
-                      setIsStatusModalOpen(true);
+                  </div>
+                )}
+              </div>
+
+              <label className="card-status-field">
+                <span>Epic</span>
+                <span className="card-select-wrapper">
+                  <select
+                    className="card-status-select"
+                    value={epicId}
+                    onChange={(event) => {
+                      const nextEpicId = event.target.value;
+                      setEpicId(nextEpicId);
+                      setSprintId("");
                     }}
                   >
-                    Create new status
-                  </button>
-                </div>
-              )}
+                    <option value="backlog">Backlog</option>
+                    {epicOptions.map((option) => (
+                      <option value={option.id} key={option.id}>
+                        {option.title}
+                      </option>
+                    ))}
+                  </select>
+                  <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                    <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                  </svg>
+                </span>
+              </label>
+
+              <label className="card-status-field">
+                <span>Sprint</span>
+                <span className="card-select-wrapper">
+                  <select
+                    className="card-status-select"
+                    value={sprintId}
+                    onChange={(event) => setSprintId(event.target.value)}
+                    disabled={epicId === "backlog"}
+                  >
+                    <option value="">No sprint</option>
+                    {selectedEpicSprints.map((option) => (
+                      <option value={option.id} key={option.id}>
+                        {option.title}
+                      </option>
+                    ))}
+                  </select>
+                  <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
+                    <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
+                  </svg>
+                </span>
+              </label>
             </div>
-
-            <label className="card-status-field">
-              <span>Epic</span>
-              <span className="card-select-wrapper">
-                <select
-                  className="card-status-select"
-                  value={epicId}
-                  onChange={(event) => {
-                    const nextEpicId = event.target.value;
-                    setEpicId(nextEpicId);
-                    setSprintId("");
-                  }}
-                >
-                  <option value="backlog">Backlog</option>
-                  {epicOptions.map((option) => (
-                    <option value={option.id} key={option.id}>
-                      {option.title}
-                    </option>
-                  ))}
-                </select>
-                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                  <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                </svg>
-              </span>
-            </label>
-
-            <label className="card-status-field">
-              <span>Sprint</span>
-              <span className="card-select-wrapper">
-                <select
-                  className="card-status-select"
-                  value={sprintId}
-                  onChange={(event) => setSprintId(event.target.value)}
-                  disabled={epicId === "backlog"}
-                >
-                  <option value="">No sprint</option>
-                  {selectedEpicSprints.map((option) => (
-                    <option value={option.id} key={option.id}>
-                      {option.title}
-                    </option>
-                  ))}
-                </select>
-                <svg aria-hidden="true" fill="none" height="14" viewBox="0 0 24 24" width="14">
-                  <path d="m6 9 6 6 6-6" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" />
-                </svg>
-              </span>
-            </label>
           </div>
 
           <div className="card-detail-actions">

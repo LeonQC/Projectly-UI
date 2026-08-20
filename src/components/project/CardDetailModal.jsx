@@ -1044,7 +1044,11 @@ function CardDetailModal({
                         <button
                           className={`card-label is-${label.color}`}
                           type="button"
-                          onClick={() => setLabelPendingRemoveId(label.id)}
+                          aria-label={`Open ${label.text} label menu`}
+                          onContextMenu={(event) => {
+                            event.preventDefault();
+                            setLabelPendingRemoveId(label.id);
+                          }}
                         >
                           {label.text}
                         </button>
@@ -1054,7 +1058,7 @@ function CardDetailModal({
                               type="button"
                               onClick={() => removeLabel(label.id)}
                             >
-                              Remove
+                              Delete
                             </button>
                           </span>
                         )}

@@ -1,4 +1,5 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api";
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ?? "http://127.0.0.1:8000/api";
 const AUTH_TOKEN_KEY = "projectly_access_token";
 
 export function getAuthToken() {
@@ -29,7 +30,9 @@ export async function apiFetch(path, options = {}) {
     headers,
   });
   const contentType = response.headers.get("content-type") ?? "";
-  const payload = contentType.includes("application/json") ? await response.json() : null;
+  const payload = contentType.includes("application/json")
+    ? await response.json()
+    : null;
 
   if (!response.ok) {
     if (response.status === 403) {
@@ -39,7 +42,7 @@ export async function apiFetch(path, options = {}) {
     const detail = payload?.detail;
     const message = Array.isArray(detail)
       ? detail.map((item) => item.msg).join(" ")
-      : detail ?? payload?.message ?? "Request failed";
+      : (detail ?? payload?.message ?? "Request failed");
     throw new Error(message);
   }
 
@@ -283,7 +286,10 @@ export async function listEpicSprints(epicId) {
   return payload.data;
 }
 
-export async function createSprint(epicId, { endDate, goal, startDate, title }) {
+export async function createSprint(
+  epicId,
+  { endDate, goal, startDate, title },
+) {
   const payload = await apiFetch(`/epics/${epicId}/sprints`, {
     method: "POST",
     body: JSON.stringify({
@@ -324,6 +330,16 @@ export async function permanentlyDeleteSprint(sprintId) {
   });
 }
 
+export async function searchCards(workspaceId, query, limit = 10) {
+  const params = new URLSearchParams({
+    workspace_id: String(workspaceId),
+    q: query,
+    limit: String(limit),
+  });
+
+  return apiFetch(`/search/cards?${params.toString()}`);
+}
+
 export async function listProjectCards(projectId) {
   const payload = await apiFetch(`/projects/${projectId}/cards`);
   return payload.data;
@@ -334,7 +350,10 @@ export async function listArchivedProjectCards(projectId) {
   return payload.data;
 }
 
-export async function createCard(projectId, { description, epicId, position = 0, status = "backlog", title }) {
+export async function createCard(
+  projectId,
+  { description, epicId, position = 0, status = "backlog", title },
+) {
   const payload = await apiFetch(`/projects/${projectId}/cards`, {
     method: "POST",
     body: JSON.stringify({
@@ -424,7 +443,10 @@ export async function deleteCardMember(memberId) {
   });
 }
 
-export async function createCardAttachment(cardId, { fileName, fileSize, fileType, fileUrl }) {
+export async function createCardAttachment(
+  cardId,
+  { fileName, fileSize, fileType, fileUrl },
+) {
   const payload = await apiFetch(`/cards/${cardId}/attachments`, {
     method: "POST",
     body: JSON.stringify({
@@ -543,9 +565,12 @@ export async function listGitHubAppInstallations() {
 }
 
 export async function claimGitHubAppInstallation(installationId) {
-  const payload = await apiFetch(`/github/app/installations/${installationId}/claim`, {
-    method: "POST",
-  });
+  const payload = await apiFetch(
+    `/github/app/installations/${installationId}/claim`,
+    {
+      method: "POST",
+    },
+  );
   return payload.data;
 }
 
@@ -581,7 +606,10 @@ export async function declineInvitation(invitationId) {
   return payload.data;
 }
 
-export async function createWorkspaceInvitation(workspaceId, { email, role = "member" }) {
+export async function createWorkspaceInvitation(
+  workspaceId,
+  { email, role = "member" },
+) {
   const payload = await apiFetch(`/workspaces/${workspaceId}/invitations`, {
     method: "POST",
     body: JSON.stringify({ email, role }),

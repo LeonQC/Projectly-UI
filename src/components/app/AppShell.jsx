@@ -1,11 +1,12 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { matchPath, useLocation, useNavigate } from "react-router-dom";
+
 import {
   archiveProject as archiveProjectRequest,
   archiveWorkspace as archiveWorkspaceRequest,
   createProject as createProjectRequest,
-  getProject as getProjectRequest,
   createWorkspace as createWorkspaceRequest,
+  getProject as getProjectRequest,
   listArchivedProjects,
   listArchivedWorkspaces,
   listGuestProjects,
@@ -20,13 +21,16 @@ import {
   updateProject as updateProjectRequest,
   updateWorkspace as updateWorkspaceRequest,
 } from "../../lib/api.js";
+
 import { user } from "../../data/mockWorkspaceData.js";
+
 import AllProjectsPage from "../../pages/app/AllProjectsPage.jsx";
 import InboxPage from "../../pages/app/InboxPage.jsx";
 import ProjectBacklogPage from "../../pages/app/ProjectBacklogPage.jsx";
 import UserSettingsPage from "../../pages/app/UserSettingsPage.jsx";
-import ArchivedProjects from "../workspace/ArchivedProjects.jsx";
 import WorkspaceProjectsPage from "../../pages/app/WorkspaceProjectsPage.jsx";
+
+import ArchivedProjects from "../workspace/ArchivedProjects.jsx";
 import Sidebar from "./Sidebar.jsx";
 
 function getInitials(name) {
@@ -67,8 +71,12 @@ function mapGuestWorkspaces(projects) {
 
   projects.forEach((projectData) => {
     const project = mapProject(projectData);
+
     const workspaceId = project.workspace_id;
-    const workspaceName = projectData.workspace_name ?? `Workspace ${workspaceId}`;
+
+    const workspaceName =
+      projectData.workspace_name ?? `Workspace ${workspaceId}`;
+
     const existingWorkspace = workspaceGroups.get(workspaceId) ?? {
       id: workspaceId,
       name: workspaceName,
@@ -87,14 +95,22 @@ function mapGuestWorkspaces(projects) {
 }
 
 function mapWorkspaceMember(member) {
-  const name = member.user?.username || member.user?.email || `User ${member.user?.id ?? ""}`.trim();
-  const role = member.role ? member.role.charAt(0).toUpperCase() + member.role.slice(1) : "Member";
+  const name =
+    member.user?.username ||
+    member.user?.email ||
+    `User ${member.user?.id ?? ""}`.trim();
+
+  const role = member.role
+    ? member.role.charAt(0).toUpperCase() + member.role.slice(1)
+    : "Member";
 
   return {
     id: member.user?.id ?? member.id,
     workspaceMemberId: member.id,
     name,
-    username: member.user?.email ? member.user.email : `@user-${member.user?.id ?? "unknown"}`,
+    username: member.user?.email
+      ? member.user.email
+      : `@user-${member.user?.id ?? "unknown"}`,
     initials: getInitials(name),
     role,
     membership: "Workspace member",
@@ -102,15 +118,19 @@ function mapWorkspaceMember(member) {
 }
 
 function userCanManageWorkspace(workspace, userId) {
-  const currentMember = (workspace.members ?? []).find((member) => String(member.id) === String(userId));
+  const currentMember = (workspace.members ?? []).find(
+    (member) => String(member.id) === String(userId),
+  );
+
   return ["owner", "admin"].includes(currentMember?.role?.toLowerCase());
 }
 
 function getRoutePage(pathname) {
   const cardMatch = matchPath(
     "/workspaces/:workspaceId/projects/:projectId/cards/:cardId",
-    pathname
+    pathname,
   );
+
   if (cardMatch) {
     return {
       name: "project-backlog",
@@ -120,7 +140,11 @@ function getRoutePage(pathname) {
     };
   }
 
-  const projectMatch = matchPath("/workspaces/:workspaceId/projects/:projectId", pathname);
+  const projectMatch = matchPath(
+    "/workspaces/:workspaceId/projects/:projectId",
+    pathname,
+  );
+
   if (projectMatch) {
     return {
       name: "project-backlog",
@@ -130,6 +154,7 @@ function getRoutePage(pathname) {
   }
 
   const workspaceMatch = matchPath("/workspaces/:workspaceId", pathname);
+
   if (workspaceMatch) {
     return {
       name: "workspace-projects",
@@ -139,27 +164,38 @@ function getRoutePage(pathname) {
   }
 
   if (pathname === "/inbox") {
-    return { name: "inbox" };
+    return {
+      name: "inbox",
+    };
   }
 
   if (pathname === "/settings" || pathname.startsWith("/settings/")) {
-    return { name: "user-settings" };
+    return {
+      name: "user-settings",
+    };
   }
 
   if (pathname === "/archived-workspace") {
-    return { name: "archived-workspace" };
+    return {
+      name: "archived-workspace",
+    };
   }
 
-  return { name: "all-projects" };
+  return {
+    name: "all-projects",
+  };
 }
 
 const sidebarWidthStorageKey = "projectly-sidebar-width";
+
 const minSidebarWidth = 180;
 const maxSidebarWidth = 420;
 const defaultSidebarWidth = 220;
 
 function getStoredSidebarWidth() {
-  const storedWidth = Number(window.localStorage.getItem(sidebarWidthStorageKey));
+  const storedWidth = Number(
+    window.localStorage.getItem(sidebarWidthStorageKey),
+  );
 
   if (!Number.isFinite(storedWidth)) {
     return defaultSidebarWidth;
@@ -171,6 +207,7 @@ function getStoredSidebarWidth() {
 function AppShell({ currentUser, onLogout, onUserUpdated }) {
   const location = useLocation();
   const navigate = useNavigate();
+
   const sidebarUser = currentUser
     ? {
         ...user,
@@ -181,66 +218,116 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
         theme: currentUser.theme,
       }
     : user;
+
   const [isSidebarVisible, setIsSidebarVisible] = useState(true);
+
   const [sidebarWidth, setSidebarWidth] = useState(getStoredSidebarWidth);
+
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
-  const [activePage, setActivePage] = useState(() => getRoutePage(window.location.pathname));
+
+  const [activePage, setActivePage] = useState(() =>
+    getRoutePage(window.location.pathname),
+  );
+
   const [archivedProjects, setArchivedProjects] = useState([]);
+
   const [workspaces, setWorkspaces] = useState([]);
+
   const [guestProjectWorkspaces, setGuestProjectWorkspaces] = useState([]);
+
   const [notifications, setNotifications] = useState([]);
+
   const [archivedWorkspaces, setArchivedWorkspaces] = useState([]);
+
   const [workspaceError, setWorkspaceError] = useState("");
+
   const [isLoadingWorkspaces, setIsLoadingWorkspaces] = useState(true);
+
   const [pendingArchivedActionKey, setPendingArchivedActionKey] = useState("");
+
   const activeWorkspace =
-    workspaces.find((workspace) => workspace.id === activePage.workspaceId) ?? workspaces[0] ?? null;
-  const allProjects = [...workspaces, ...guestProjectWorkspaces].flatMap((workspace) => workspace.projects);
+    workspaces.find((workspace) => workspace.id === activePage.workspaceId) ??
+    workspaces[0] ??
+    null;
+
+  const allProjects = [...workspaces, ...guestProjectWorkspaces].flatMap(
+    (workspace) => workspace.projects,
+  );
+
   const activeProject =
-    allProjects.find((project) => project.id === activePage.projectId) ?? allProjects[0] ?? null;
+    allProjects.find((project) => project.id === activePage.projectId) ??
+    allProjects[0] ??
+    null;
+
   const activeProjectWorkspace =
     workspaces.find((workspace) =>
-      workspace.projects.some((project) => project.id === activeProject?.id)
+      workspace.projects.some((project) => project.id === activeProject?.id),
     ) ??
     guestProjectWorkspaces.find((workspace) =>
-      workspace.projects.some((project) => project.id === activeProject?.id)
+      workspace.projects.some((project) => project.id === activeProject?.id),
     ) ??
     workspaces[0] ??
     guestProjectWorkspaces[0] ??
     null;
+
   const archivedProjectsWithWorkspace = archivedProjects.map((project) => ({
     ...project,
+
     workspaceName:
-      workspaces.find((workspace) => workspace.id === project.workspace_id)?.name ??
-      archivedWorkspaces.find((workspace) => workspace.id === project.workspace_id)?.name,
+      workspaces.find((workspace) => workspace.id === project.workspace_id)
+        ?.name ??
+      archivedWorkspaces.find(
+        (workspace) => workspace.id === project.workspace_id,
+      )?.name,
   }));
+
   const activeWorkspaceArchivedProjects = archivedProjects.filter(
-    (project) => project.workspace_id === activeWorkspace?.id
+    (project) => project.workspace_id === activeWorkspace?.id,
   );
-  const inboxUnreadCount = notifications.filter((notification) => !notification.read_at).length;
-  const canManageAnyWorkspace = workspaces.some((workspace) => userCanManageWorkspace(workspace, sidebarUser.id));
+
+  const inboxUnreadCount = notifications.filter(
+    (notification) => !notification.read_at,
+  ).length;
+
+  const canManageAnyWorkspace = workspaces.some((workspace) =>
+    userCanManageWorkspace(workspace, sidebarUser.id),
+  );
 
   useEffect(() => {
     setActivePage(getRoutePage(location.pathname));
   }, [location.pathname]);
 
   useEffect(() => {
-    if (!isLoadingWorkspaces && activePage.name === "archived-workspace" && !canManageAnyWorkspace) {
+    if (
+      !isLoadingWorkspaces &&
+      activePage.name === "archived-workspace" &&
+      !canManageAnyWorkspace
+    ) {
       navigate("/");
-      setActivePage({ name: "all-projects" });
+
+      setActivePage({
+        name: "all-projects",
+      });
     }
   }, [activePage.name, canManageAnyWorkspace, isLoadingWorkspaces, navigate]);
 
   const loadWorkspaceData = useCallback(async () => {
     setIsLoadingWorkspaces(true);
     setWorkspaceError("");
+
     try {
-      const [activeWorkspaceData, archivedWorkspaceData, archivedProjectData, guestProjectData] = await Promise.all([
+      const [
+        activeWorkspaceData,
+        archivedWorkspaceData,
+        archivedProjectData,
+        guestProjectData,
+      ] = await Promise.all([
         listWorkspaces(),
         listArchivedWorkspaces(),
         listArchivedProjects(),
         listGuestProjects(),
       ]);
+
       const workspacesWithProjects = await Promise.all(
         activeWorkspaceData.map(async (workspace) => {
           const [projectData, memberData] = await Promise.all([
@@ -250,15 +337,20 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
           return {
             ...mapWorkspace(workspace),
+
             members: memberData.map(mapWorkspaceMember),
+
             projects: projectData.map(mapProject),
           };
-        })
+        }),
       );
 
       setWorkspaces(workspacesWithProjects);
+
       setGuestProjectWorkspaces(mapGuestWorkspaces(guestProjectData));
+
       setArchivedWorkspaces(archivedWorkspaceData.map(mapWorkspace));
+
       setArchivedProjects(archivedProjectData.map(mapProject));
     } catch (error) {
       setWorkspaceError(error.message);
@@ -289,7 +381,11 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
     }
 
     function resizeSidebar(event) {
-      const nextWidth = Math.min(maxSidebarWidth, Math.max(minSidebarWidth, event.clientX));
+      const nextWidth = Math.min(
+        maxSidebarWidth,
+        Math.max(minSidebarWidth, event.clientX),
+      );
+
       setSidebarWidth(nextWidth);
     }
 
@@ -298,12 +394,16 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
     }
 
     window.addEventListener("pointermove", resizeSidebar);
+
     window.addEventListener("pointerup", stopResizingSidebar);
+
     document.body.classList.add("is-resizing-sidebar");
 
     return () => {
       window.removeEventListener("pointermove", resizeSidebar);
+
       window.removeEventListener("pointerup", stopResizingSidebar);
+
       document.body.classList.remove("is-resizing-sidebar");
     };
   }, [isResizingSidebar]);
@@ -314,7 +414,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function archiveProject(projectId) {
     const projectWorkspace = workspaces.find((workspace) =>
-      workspace.projects.some((project) => project.id === projectId)
+      workspace.projects.some((project) => project.id === projectId),
     );
 
     if (!projectWorkspace) {
@@ -322,15 +422,20 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
     }
 
     setWorkspaceError("");
+
     setPendingArchivedActionKey(`project:${projectId}`);
+
     try {
       await archiveProjectRequest(projectId);
+
       navigate(`/workspaces/${projectWorkspace.id}`);
+
       setActivePage({
         name: "workspace-projects",
         workspaceId: projectWorkspace.id,
         workspaceTab: "archived-projects",
       });
+
       await loadWorkspaceData();
     } catch (error) {
       setWorkspaceError(error.message);
@@ -341,15 +446,20 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function restoreProject(projectId) {
     setWorkspaceError("");
+
     setPendingArchivedActionKey(`project:${projectId}`);
+
     try {
       const project = mapProject(await restoreProjectRequest(projectId));
+
       navigate(`/workspaces/${project.workspace_id}`);
+
       setActivePage({
         name: "workspace-projects",
         workspaceId: project.workspace_id,
         workspaceTab: "projects",
       });
+
       await loadWorkspaceData();
     } catch (error) {
       setWorkspaceError(error.message);
@@ -360,14 +470,20 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function permanentlyDeleteProject(projectId) {
     setWorkspaceError("");
+
     setPendingArchivedActionKey(`project:${projectId}`);
+
     try {
       await permanentlyDeleteProjectRequest(projectId);
+
       await loadWorkspaceData();
 
       if (activePage.projectId === projectId) {
         navigate("/archived-workspace");
-        setActivePage({ name: "archived-workspace" });
+
+        setActivePage({
+          name: "archived-workspace",
+        });
       }
     } catch (error) {
       setWorkspaceError(error.message);
@@ -378,22 +494,35 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   function openAllProjects() {
     navigate("/");
-    setActivePage({ name: "all-projects" });
+
+    setActivePage({
+      name: "all-projects",
+    });
   }
 
   function openArchivedProjects() {
     navigate("/archived-workspace");
-    setActivePage({ name: "archived-workspace" });
+
+    setActivePage({
+      name: "archived-workspace",
+    });
+
     loadWorkspaceData();
   }
 
   function openInbox() {
     navigate("/inbox");
-    setActivePage({ name: "inbox" });
+
+    setActivePage({
+      name: "inbox",
+    });
   }
 
   function openCardMention(target) {
-    navigate(`/workspaces/${target.workspace_id}/projects/${target.project_id}/cards/${target.card_id}`);
+    navigate(
+      `/workspaces/${target.workspace_id}/projects/${target.project_id}/cards/${target.card_id}`,
+    );
+
     setActivePage({
       name: "project-backlog",
       workspaceId: target.workspace_id,
@@ -402,81 +531,120 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
     });
   }
 
-  function openUserSettings() {
-    navigate("/settings");
-    setActivePage({ name: "user-settings" });
+  function openSearchCard(card) {
+    navigate(
+      `/workspaces/${card.workspace_id}/projects/${card.project_id}/cards/${card.id}`,
+    );
+
+    setActivePage({
+      name: "project-backlog",
+      workspaceId: card.workspace_id,
+      projectId: card.project_id,
+      cardId: card.id,
+    });
   }
 
-  function openWorkspaceProjects(workspaceId, workspaceTab = "projects", options = {}) {
+  function openUserSettings() {
+    navigate("/settings");
+
+    setActivePage({
+      name: "user-settings",
+    });
+  }
+
+  function openWorkspaceProjects(
+    workspaceId,
+    workspaceTab = "projects",
+    options = {},
+  ) {
     navigate(`/workspaces/${workspaceId}`);
+
     setActivePage({
       name: "workspace-projects",
+
       workspaceId,
+
       workspaceTab,
+
       openCreateProject: options.openCreateProject ?? false,
+
       createProjectRequestId: options.openCreateProject ? Date.now() : null,
     });
   }
 
   async function openProject(projectId) {
     const projectWorkspace = workspaces.find((workspace) =>
-      workspace.projects.some((project) => project.id === projectId)
+      workspace.projects.some((project) => project.id === projectId),
     );
 
     setWorkspaceError("");
+
     try {
       const project = mapProject(await getProjectRequest(projectId));
+
       setWorkspaces((currentWorkspaces) =>
         currentWorkspaces.map((workspace) =>
           workspace.id === project.workspace_id
             ? {
                 ...workspace,
+
                 projects: workspace.projects.map((currentProject) =>
                   currentProject.id === project.id
                     ? {
                         ...currentProject,
                         ...project,
+
                         epics: currentProject.epics,
                       }
-                    : currentProject
+                    : currentProject,
                 ),
               }
-            : workspace
-        )
+            : workspace,
+        ),
       );
+
       setGuestProjectWorkspaces((currentWorkspaces) =>
         currentWorkspaces.map((workspace) =>
           workspace.id === project.workspace_id
             ? {
                 ...workspace,
+
                 projects: workspace.projects.map((currentProject) =>
                   currentProject.id === project.id
                     ? {
                         ...currentProject,
                         ...project,
+
                         epics: currentProject.epics,
                       }
-                    : currentProject
+                    : currentProject,
                 ),
               }
-            : workspace
-        )
+            : workspace,
+        ),
       );
 
       setActivePage({
         name: "project-backlog",
+
         projectId,
+
         workspaceId: project.workspace_id,
       });
+
       navigate(`/workspaces/${project.workspace_id}/projects/${projectId}`);
     } catch (error) {
       setWorkspaceError(error.message);
+
       if (projectWorkspace) {
         setActivePage({
           name: "project-backlog",
+
           projectId,
+
           workspaceId: projectWorkspace.id,
         });
+
         navigate(`/workspaces/${projectWorkspace.id}/projects/${projectId}`);
       }
     }
@@ -484,41 +652,53 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function createProject(workspaceId, projectInput) {
     setWorkspaceError("");
+
     try {
-      const project = mapProject(await createProjectRequest(workspaceId, projectInput));
+      const project = mapProject(
+        await createProjectRequest(workspaceId, projectInput),
+      );
+
       setWorkspaces((currentWorkspaces) =>
         currentWorkspaces.map((workspace) =>
           workspace.id === workspaceId
             ? {
                 ...workspace,
+
                 projects: [...workspace.projects, project],
               }
-            : workspace
-        )
+            : workspace,
+        ),
       );
     } catch (error) {
       setWorkspaceError(error.message);
+
       throw error;
     }
   }
 
   async function updateProject(projectId, projectInput) {
     setWorkspaceError("");
+
     try {
-      const project = mapProject(await updateProjectRequest(projectId, projectInput));
+      const project = mapProject(
+        await updateProjectRequest(projectId, projectInput),
+      );
+
       setWorkspaces((currentWorkspaces) =>
         currentWorkspaces.map((workspace) => ({
           ...workspace,
+
           projects: workspace.projects.map((currentProject) =>
             currentProject.id === projectId
               ? {
                   ...currentProject,
                   ...project,
+
                   epics: currentProject.epics,
                 }
-              : currentProject
+              : currentProject,
           ),
-        }))
+        })),
       );
     } catch (error) {
       setWorkspaceError(error.message);
@@ -527,14 +707,21 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function createWorkspace(workspaceInput) {
     setWorkspaceError("");
+
     try {
-      const workspace = mapWorkspace(await createWorkspaceRequest(workspaceInput));
+      const workspace = mapWorkspace(
+        await createWorkspaceRequest(workspaceInput),
+      );
+
       setWorkspaces((currentWorkspaces) => [...currentWorkspaces, workspace]);
 
       navigate(`/workspaces/${workspace.id}`);
+
       setActivePage({
         name: "workspace-projects",
+
         workspaceId: workspace.id,
+
         workspaceTab: "projects",
       });
     } catch (error) {
@@ -544,14 +731,23 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function renameWorkspace(workspaceId, workspaceInput) {
     setWorkspaceError("");
+
     try {
-      const workspace = mapWorkspace(await updateWorkspaceRequest(workspaceId, workspaceInput));
+      const workspace = mapWorkspace(
+        await updateWorkspaceRequest(workspaceId, workspaceInput),
+      );
+
       setWorkspaces((currentWorkspaces) =>
         currentWorkspaces.map((currentWorkspace) =>
           currentWorkspace.id === workspace.id
-            ? { ...currentWorkspace, ...workspace, projects: currentWorkspace.projects }
-            : currentWorkspace
-        )
+            ? {
+                ...currentWorkspace,
+                ...workspace,
+
+                projects: currentWorkspace.projects,
+              }
+            : currentWorkspace,
+        ),
       );
     } catch (error) {
       setWorkspaceError(error.message);
@@ -559,17 +755,27 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
   }
 
   async function archiveWorkspace(workspaceId) {
-    const workspace = workspaces.find((currentWorkspace) => currentWorkspace.id === workspaceId);
+    const workspace = workspaces.find(
+      (currentWorkspace) => currentWorkspace.id === workspaceId,
+    );
+
     if (!workspace) {
       return;
     }
 
     setWorkspaceError("");
+
     setPendingArchivedActionKey(`workspace:${workspaceId}`);
+
     try {
       await archiveWorkspaceRequest(workspaceId);
+
       navigate("/archived-workspace");
-      setActivePage({ name: "archived-workspace" });
+
+      setActivePage({
+        name: "archived-workspace",
+      });
+
       await loadWorkspaceData();
     } catch (error) {
       setWorkspaceError(error.message);
@@ -580,11 +786,24 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function restoreWorkspace(workspaceId) {
     setWorkspaceError("");
+
     setPendingArchivedActionKey(`workspace:${workspaceId}`);
+
     try {
-      const workspace = mapWorkspace(await restoreWorkspaceRequest(workspaceId));
+      const workspace = mapWorkspace(
+        await restoreWorkspaceRequest(workspaceId),
+      );
+
       navigate(`/workspaces/${workspace.id}`);
-      setActivePage({ name: "workspace-projects", workspaceId: workspace.id, workspaceTab: "projects" });
+
+      setActivePage({
+        name: "workspace-projects",
+
+        workspaceId: workspace.id,
+
+        workspaceTab: "projects",
+      });
+
       await loadWorkspaceData();
     } catch (error) {
       setWorkspaceError(error.message);
@@ -595,9 +814,12 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
 
   async function permanentlyDeleteWorkspace(workspaceId) {
     setWorkspaceError("");
+
     setPendingArchivedActionKey(`workspace:${workspaceId}`);
+
     try {
       await permanentlyDeleteWorkspaceRequest(workspaceId);
+
       await loadWorkspaceData();
     } catch (error) {
       setWorkspaceError(error.message);
@@ -615,6 +837,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
         isSidebarVisible
           ? {
               "--sidebar-width": `${sidebarWidth}px`,
+
               gridTemplateColumns: `${sidebarWidth}px minmax(0, 1fr)`,
             }
           : undefined
@@ -626,6 +849,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           inboxUnreadCount={inboxUnreadCount}
           onOpenArchivedProjects={openArchivedProjects}
           onOpenAllProjects={openAllProjects}
+          onOpenCard={openSearchCard}
           onOpenInbox={openInbox}
           onOpenProject={openProject}
           onOpenUserSettings={openUserSettings}
@@ -638,6 +862,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           workspaces={workspaces}
         />
       )}
+
       {isSidebarVisible && (
         <button
           className="sidebar-resize-handle"
@@ -645,10 +870,12 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           aria-label="Resize sidebar"
           onPointerDown={(event) => {
             event.preventDefault();
+
             setIsResizingSidebar(true);
           }}
         />
       )}
+
       <button
         className="sidebar-toggle-button"
         type="button"
@@ -673,9 +900,16 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
             x="3"
             y="4"
           />
-          <path d="M9 5v14" stroke="currentColor" strokeLinecap="round" strokeWidth="2" />
+
+          <path
+            d="M9 5v14"
+            stroke="currentColor"
+            strokeLinecap="round"
+            strokeWidth="2"
+          />
         </svg>
       </button>
+
       {activePage.name === "inbox" ? (
         <InboxPage
           notifications={notifications}
@@ -687,13 +921,18 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       ) : activePage.name === "user-settings" ? (
         <UserSettingsPage onUserUpdated={onUserUpdated} user={sidebarUser} />
       ) : activePage.name === "archived-workspace" ? (
-        <section className="app-content" aria-labelledby="archived-workspace-title">
+        <section
+          className="app-content"
+          aria-labelledby="archived-workspace-title"
+        >
           <header className="page-header">
             <div>
               <h1 id="archived-workspace-title">Archived Workspace</h1>
             </div>
           </header>
+
           {workspaceError && <p className="app-error">{workspaceError}</p>}
+
           <ArchivedProjects
             onPermanentlyDeleteProject={permanentlyDeleteProject}
             onPermanentlyDeleteWorkspace={permanentlyDeleteWorkspace}
@@ -704,19 +943,30 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
             workspaces={archivedWorkspaces}
           />
         </section>
-      ) : activePage.name === "project-backlog" && activeProject && activeProjectWorkspace ? (
+      ) : activePage.name === "project-backlog" &&
+        activeProject &&
+        activeProjectWorkspace ? (
         <ProjectBacklogPage
           currentUserId={sidebarUser.id}
           initialCardId={activePage.cardId}
           onArchiveProject={archiveProject}
-          onCloseCardRoute={() => navigate(`/workspaces/${activeProjectWorkspace.id}/projects/${activeProject.id}`)}
+          onCloseCardRoute={() =>
+            navigate(
+              `/workspaces/${activeProjectWorkspace.id}/projects/${activeProject.id}`,
+            )
+          }
           onOpenCardRoute={(cardId) =>
-            navigate(`/workspaces/${activeProjectWorkspace.id}/projects/${activeProject.id}/cards/${cardId}`)
+            navigate(
+              `/workspaces/${activeProjectWorkspace.id}/projects/${activeProject.id}/cards/${cardId}`,
+            )
           }
           onUpdateProject={updateProject}
           project={activeProject}
           workspace={activeProjectWorkspace}
-          canManageWorkspace={userCanManageWorkspace(activeProjectWorkspace, sidebarUser.id)}
+          canManageWorkspace={userCanManageWorkspace(
+            activeProjectWorkspace,
+            sidebarUser.id,
+          )}
         />
       ) : activePage.name === "workspace-projects" && activeWorkspace ? (
         <WorkspaceProjectsPage
@@ -724,7 +974,10 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
           createProjectRequestId={activePage.createProjectRequestId}
           currentUserId={sidebarUser.id}
           initialTab={activePage.workspaceTab}
-          canManageWorkspace={userCanManageWorkspace(activeWorkspace, sidebarUser.id)}
+          canManageWorkspace={userCanManageWorkspace(
+            activeWorkspace,
+            sidebarUser.id,
+          )}
           onArchiveWorkspace={archiveWorkspace}
           onCreateProject={createProject}
           onRenameWorkspace={renameWorkspace}
@@ -740,6 +993,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       ) : (
         <>
           {workspaceError && <p className="app-error">{workspaceError}</p>}
+
           {isLoadingWorkspaces ? (
             <section className="app-content" aria-label="Loading workspaces">
               <p className="empty-state">Loading workspaces...</p>

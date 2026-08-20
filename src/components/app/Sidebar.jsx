@@ -1,7 +1,15 @@
 import React, { useEffect, useRef, useState } from "react";
+
+import { searchCards } from "../../lib/api.js";
 import CreateWorkspaceModal from "../workspace/CreateWorkspaceModal.jsx";
 
-function WorkspaceNavGroup({ activePage, onOpenWorkspaceProjects, title, workspaces, children }) {
+function WorkspaceNavGroup({
+  activePage,
+  onOpenWorkspaceProjects,
+  title,
+  workspaces,
+  children,
+}) {
   const [isExpanded, setIsExpanded] = useState(true);
   const activeWorkspaceId = activePage.workspaceId;
 
@@ -15,6 +23,7 @@ function WorkspaceNavGroup({ activePage, onOpenWorkspaceProjects, title, workspa
     <section className="sidebar-section" aria-label={title}>
       <div className="sidebar-section-header">
         <h2 className="sidebar-section-title">{title}</h2>
+
         <button
           className="section-toggle-button"
           type="button"
@@ -40,19 +49,24 @@ function WorkspaceNavGroup({ activePage, onOpenWorkspaceProjects, title, workspa
           </svg>
         </button>
       </div>
+
       {isExpanded && (
         <div className="workspace-list">
           {workspaces.map((workspace) => (
             <button
-              className={`workspace-item ${activeWorkspaceId === workspace.id ? "is-active" : ""}`}
+              className={`workspace-item ${
+                activeWorkspaceId === workspace.id ? "is-active" : ""
+              }`}
               type="button"
               key={workspace.id}
               onClick={() => onOpenWorkspaceProjects(workspace.id)}
             >
               <span className="workspace-icon">{workspace.name.charAt(0)}</span>
+
               <span>{workspace.name}</span>
             </button>
           ))}
+
           {children}
         </div>
       )}
@@ -64,14 +78,15 @@ function Sidebar({
   activePage,
   guestWorkspaces = [],
   inboxUnreadCount = 0,
-  onOpenArchivedProjects,
+  onCreateWorkspace,
+  onLogout,
   onOpenAllProjects,
+  onOpenArchivedProjects,
+  onOpenCard,
   onOpenInbox,
   onOpenProject,
   onOpenUserSettings,
   onOpenWorkspaceProjects,
-  onCreateWorkspace,
-  onLogout,
   showArchivedWorkspace = true,
   user,
   workspaces,
@@ -79,22 +94,35 @@ function Sidebar({
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
+
   const [searchQuery, setSearchQuery] = useState("");
+  const [cardResults, setCardResults] = useState([]);
+  const [isSearchingCards, setIsSearchingCards] = useState(false);
+  const [cardSearchError, setCardSearchError] = useState("");
+
   const userMenuRef = useRef(null);
   const searchRef = useRef(null);
+
+  const activeWorkspaceId = activePage.workspaceId;
+
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
   const workspaceResults = workspaces.filter((workspace) =>
-    workspace.name.toLowerCase().includes(normalizedSearchQuery)
+    workspace.name.toLowerCase().includes(normalizedSearchQuery),
   );
-  const projectResults = [...workspaces, ...guestWorkspaces].flatMap((workspace) =>
-    (workspace.projects ?? [])
-      .filter((project) =>
-        `${project.name} ${workspace.name}`.toLowerCase().includes(normalizedSearchQuery)
-      )
-      .map((project) => ({
-        ...project,
-        workspaceName: workspace.name,
-      }))
+
+  const projectResults = [...workspaces, ...guestWorkspaces].flatMap(
+    (workspace) =>
+      (workspace.projects ?? [])
+        .filter((project) =>
+          `${project.name} ${workspace.name}`
+            .toLowerCase()
+            .includes(normalizedSearchQuery),
+        )
+        .map((project) => ({
+          ...project,
+          workspaceName: workspace.name,
+        })),
   );
 
   useEffect(() => {
@@ -129,16 +157,68 @@ function Sidebar({
     };
   }, []);
 
+  useEffect(() => {
+    const query = searchQuery.trim();
+
+    if (!query || !activeWorkspaceId) {
+      setCardResults([]);
+      setCardSearchError("");
+      setIsSearchingCards(false);
+      return;
+    }
+
+    let isCancelled = false;
+
+    const timeoutId = window.setTimeout(async () => {
+      try {
+        setIsSearchingCards(true);
+        setCardSearchError("");
+
+        const result = await searchCards(activeWorkspaceId, query, 10);
+
+        if (isCancelled) {
+          return;
+        }
+
+        setCardResults(result.items ?? []);
+      } catch (error) {
+        if (isCancelled) {
+          return;
+        }
+
+        setCardResults([]);
+
+        setCardSearchError(
+          error instanceof Error ? error.message : "Unable to search cards.",
+        );
+      } finally {
+        if (!isCancelled) {
+          setIsSearchingCards(false);
+        }
+      }
+    }, 300);
+
+    return () => {
+      isCancelled = true;
+      window.clearTimeout(timeoutId);
+    };
+  }, [activeWorkspaceId, searchQuery]);
+
   function closeSearch() {
     setIsSearchOpen(false);
     setSearchQuery("");
+    setCardResults([]);
+    setCardSearchError("");
+    setIsSearchingCards(false);
   }
 
   return (
     <aside className="app-sidebar">
       <div className="sidebar-user" ref={userMenuRef}>
         <span className="user-avatar">{user.initials}</span>
+
         <span className="user-name">{user.name}</span>
+
         <button
           className="icon-button"
           type="button"
@@ -148,10 +228,11 @@ function Sidebar({
         >
           ...
         </button>
+
         <button
           className="icon-button sidebar-search-action"
           type="button"
-          aria-label="Search workspaces and projects"
+          aria-label="Search workspaces, projects, and cards"
           aria-expanded={isSearchOpen}
           onClick={() => setIsSearchOpen((isOpen) => !isOpen)}
         >
@@ -177,9 +258,10 @@ function Sidebar({
           <div className="sidebar-search-panel" ref={searchRef}>
             <label className="sidebar-search-field">
               <span>Search</span>
+
               <input
                 type="search"
-                placeholder="Search workspaces or projects"
+                placeholder="Search workspaces, projects, or cards"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 autoFocus
@@ -189,6 +271,7 @@ function Sidebar({
             <div className="sidebar-search-results">
               <section>
                 <h3>Workspaces</h3>
+
                 {workspaceResults.length > 0 ? (
                   workspaceResults.map((workspace) => (
                     <button
@@ -200,6 +283,7 @@ function Sidebar({
                       }}
                     >
                       <span className="search-result-type">Workspace</span>
+
                       <strong>{workspace.name}</strong>
                     </button>
                   ))
@@ -210,6 +294,7 @@ function Sidebar({
 
               <section>
                 <h3>Projects</h3>
+
                 {projectResults.length > 0 ? (
                   projectResults.map((project) => (
                     <button
@@ -220,12 +305,46 @@ function Sidebar({
                         closeSearch();
                       }}
                     >
-                      <span className="search-result-type">{project.workspaceName}</span>
+                      <span className="search-result-type">
+                        {project.workspaceName}
+                      </span>
+
                       <strong>{project.name}</strong>
                     </button>
                   ))
                 ) : (
                   <p>No matching projects.</p>
+                )}
+              </section>
+
+              <section>
+                <h3>Cards</h3>
+
+                {!activeWorkspaceId ? (
+                  <p>Open a workspace to search cards.</p>
+                ) : !normalizedSearchQuery ? (
+                  <p>Type to search cards.</p>
+                ) : isSearchingCards ? (
+                  <p>Searching cards...</p>
+                ) : cardSearchError ? (
+                  <p>{cardSearchError}</p>
+                ) : cardResults.length > 0 ? (
+                  cardResults.map((card) => (
+                    <button
+                      type="button"
+                      key={card.id}
+                      onClick={() => {
+                        onOpenCard(card);
+                        closeSearch();
+                      }}
+                    >
+                      <span className="search-result-type">{card.status}</span>
+
+                      <strong>{card.title}</strong>
+                    </button>
+                  ))
+                ) : (
+                  <p>No matching cards.</p>
                 )}
               </section>
             </div>
@@ -244,6 +363,7 @@ function Sidebar({
             >
               Settings
             </button>
+
             <button
               type="button"
               role="menuitem"
@@ -260,20 +380,28 @@ function Sidebar({
 
       <nav className="sidebar-primary-nav" aria-label="Main navigation">
         <button
-          className={`sidebar-primary-item ${activePage.name === "inbox" ? "is-active" : ""}`}
+          className={`sidebar-primary-item ${
+            activePage.name === "inbox" ? "is-active" : ""
+          }`}
           type="button"
           onClick={onOpenInbox}
         >
           <span>Inbox</span>
+
           {inboxUnreadCount > 0 && (
-            <span className="sidebar-unread-badge" aria-label={`${inboxUnreadCount} unread notifications`}>
+            <span
+              className="sidebar-unread-badge"
+              aria-label={`${inboxUnreadCount} unread notifications`}
+            >
               {inboxUnreadCount > 99 ? "99+" : inboxUnreadCount}
             </span>
           )}
         </button>
 
         <button
-          className={`sidebar-primary-item ${activePage.name === "all-projects" ? "is-active" : ""}`}
+          className={`sidebar-primary-item ${
+            activePage.name === "all-projects" ? "is-active" : ""
+          }`}
           type="button"
           onClick={onOpenAllProjects}
         >
@@ -289,15 +417,23 @@ function Sidebar({
       >
         {showArchivedWorkspace && (
           <button
-            className={`workspace-item archived-workspace-item ${activePage.name === "archived-workspace" ? "is-active" : ""}`}
+            className={`workspace-item archived-workspace-item ${
+              activePage.name === "archived-workspace" ? "is-active" : ""
+            }`}
             type="button"
             onClick={onOpenArchivedProjects}
           >
             <span className="workspace-icon">D</span>
+
             <span>Archived Workspace</span>
           </button>
         )}
-        <button className="create-workspace-button" type="button" onClick={() => setIsCreatingWorkspace(true)}>
+
+        <button
+          className="create-workspace-button"
+          type="button"
+          onClick={() => setIsCreatingWorkspace(true)}
+        >
           + Create new workspace
         </button>
       </WorkspaceNavGroup>

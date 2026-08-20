@@ -100,6 +100,7 @@ function App() {
     setCurrentUser(null);
     setAuthError("");
     setPage("login");
+    window.history.replaceState(null, "", "/");
   }
 
   if (page === "register") {

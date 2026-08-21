@@ -169,6 +169,47 @@ body.is-resizing-sidebar {
   font-size: 13px;
 }
 
+.sidebar-search-scope {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  border-radius: 7px;
+  background: #f1f3f6;
+  padding: 3px;
+}
+
+.sidebar-search-scope button {
+  min-height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #626f86;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.sidebar-search-scope button.is-active {
+  background: #ffffff;
+  color: #172b4d;
+  box-shadow: 0 1px 2px rgba(9, 30, 66, 0.12);
+}
+
+.sidebar-search-archived-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: #44546f;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.sidebar-search-archived-toggle input {
+  width: 14px;
+  height: 14px;
+  accent-color: #7c3aed;
+}
+
 .sidebar-search-results {
   display: grid;
   gap: 12px;
@@ -218,6 +259,17 @@ body.is-resizing-sidebar {
   color: #626f86;
   font-size: 12px;
   font-weight: 700;
+}
+
+.search-result-badge {
+  width: fit-content;
+  border: 1px solid #ffb020;
+  border-radius: 999px;
+  background: #fff7e6;
+  color: #8a4b00;
+  padding: 2px 7px;
+  font-size: 11px;
+  font-weight: 900;
 }
 
 .icon-button:hover,
@@ -3188,6 +3240,13 @@ select.card-status-select {
   background: #fbfaff;
 }
 
+.github-development-list a.is-highlighted,
+.comment-item.is-highlighted {
+  border-color: #7c3aed;
+  background: #f4efff;
+  box-shadow: 0 0 0 2px rgba(124, 58, 237, 0.14);
+}
+
 .comments-activity-panel {
   display: grid;
   align-content: start;
@@ -3391,6 +3450,9 @@ select.card-status-select {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
   gap: 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 8px;
 }
 
 .comment-item > div {

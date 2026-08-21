@@ -125,7 +125,13 @@ function userCanManageWorkspace(workspace, userId) {
   return ["owner", "admin"].includes(currentMember?.role?.toLowerCase());
 }
 
-function getRoutePage(pathname) {
+function numberOrUndefined(value) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && value ? parsed : undefined;
+}
+
+function getRoutePage(pathname, search = "") {
+  const searchParams = new URLSearchParams(search);
   const cardMatch = matchPath(
     "/workspaces/:workspaceId/projects/:projectId/cards/:cardId",
     pathname,
@@ -137,6 +143,9 @@ function getRoutePage(pathname) {
       workspaceId: Number(cardMatch.params.workspaceId),
       projectId: Number(cardMatch.params.projectId),
       cardId: Number(cardMatch.params.cardId),
+      focus: searchParams.get("focus") ?? undefined,
+      commentId: numberOrUndefined(searchParams.get("commentId")),
+      githubEventId: numberOrUndefined(searchParams.get("eventId")),
     };
   }
 
@@ -226,7 +235,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
   const [isResizingSidebar, setIsResizingSidebar] = useState(false);
 
   const [activePage, setActivePage] = useState(() =>
-    getRoutePage(window.location.pathname),
+    getRoutePage(window.location.pathname, window.location.search),
   );
 
   const [archivedProjects, setArchivedProjects] = useState([]);
@@ -294,8 +303,8 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
   );
 
   useEffect(() => {
-    setActivePage(getRoutePage(location.pathname));
-  }, [location.pathname]);
+    setActivePage(getRoutePage(location.pathname, location.search));
+  }, [location.pathname, location.search]);
 
   useEffect(() => {
     if (
@@ -519,8 +528,16 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
   }
 
   function openCardMention(target) {
+    const params = new URLSearchParams({
+      focus: "comments",
+    });
+
+    if (target.comment_id) {
+      params.set("commentId", String(target.comment_id));
+    }
+
     navigate(
-      `/workspaces/${target.workspace_id}/projects/${target.project_id}/cards/${target.card_id}`,
+      `/workspaces/${target.workspace_id}/projects/${target.project_id}/cards/${target.card_id}?${params.toString()}`,
     );
 
     setActivePage({
@@ -528,12 +545,30 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       workspaceId: target.workspace_id,
       projectId: target.project_id,
       cardId: target.card_id,
+      focus: "comments",
+      commentId: target.comment_id,
     });
   }
 
   function openSearchCard(card) {
+    const params = new URLSearchParams();
+
+    if (card.focus) {
+      params.set("focus", card.focus);
+    }
+
+    if (card.commentId) {
+      params.set("commentId", String(card.commentId));
+    }
+
+    if (card.githubEventId) {
+      params.set("eventId", String(card.githubEventId));
+    }
+
+    const routeSearch = params.toString();
+
     navigate(
-      `/workspaces/${card.workspace_id}/projects/${card.project_id}/cards/${card.id}`,
+      `/workspaces/${card.workspace_id}/projects/${card.project_id}/cards/${card.id}${routeSearch ? `?${routeSearch}` : ""}`,
     );
 
     setActivePage({
@@ -541,6 +576,9 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       workspaceId: card.workspace_id,
       projectId: card.project_id,
       cardId: card.id,
+      focus: card.focus,
+      commentId: card.commentId,
+      githubEventId: card.githubEventId,
     });
   }
 
@@ -846,6 +884,7 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
       {isSidebarVisible && (
         <Sidebar
           activePage={activePage}
+          archivedWorkspaces={archivedWorkspaces}
           inboxUnreadCount={inboxUnreadCount}
           onOpenArchivedProjects={openArchivedProjects}
           onOpenAllProjects={openAllProjects}
@@ -949,6 +988,9 @@ function AppShell({ currentUser, onLogout, onUserUpdated }) {
         <ProjectBacklogPage
           currentUserId={sidebarUser.id}
           initialCardId={activePage.cardId}
+          initialCommentId={activePage.commentId}
+          initialFocus={activePage.focus}
+          initialGithubEventId={activePage.githubEventId}
           onArchiveProject={archiveProject}
           onCloseCardRoute={() =>
             navigate(

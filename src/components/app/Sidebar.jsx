@@ -76,6 +76,7 @@ function WorkspaceNavGroup({
 
 function Sidebar({
   activePage,
+  archivedWorkspaces = [],
   guestWorkspaces = [],
   inboxUnreadCount = 0,
   onCreateWorkspace,
@@ -96,9 +97,12 @@ function Sidebar({
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [searchScope, setSearchScope] = useState("workspace");
+  const [includeArchivedSearch, setIncludeArchivedSearch] = useState(false);
   const [projectSearchResults, setProjectSearchResults] = useState([]);
   const [cardResults, setCardResults] = useState([]);
   const [commentSearchResults, setCommentSearchResults] = useState([]);
+  const [githubEventSearchResults, setGithubEventSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
   const [searchError, setSearchError] = useState("");
 
@@ -109,7 +113,24 @@ function Sidebar({
 
   const normalizedSearchQuery = searchQuery.trim().toLowerCase();
 
-  const workspaceResults = workspaces.filter((workspace) =>
+  const searchableWorkspaces = includeArchivedSearch
+    ? [
+        ...workspaces,
+        ...archivedWorkspaces.map((workspace) => ({
+          ...workspace,
+          archived: true,
+        })),
+      ]
+    : workspaces;
+
+  const scopedWorkspaces =
+    searchScope === "all"
+      ? searchableWorkspaces
+      : searchableWorkspaces.filter(
+          (workspace) => String(workspace.id) === String(activeWorkspaceId),
+        );
+
+  const workspaceResults = scopedWorkspaces.filter((workspace) =>
     workspace.name.toLowerCase().includes(normalizedSearchQuery),
   );
 
@@ -148,10 +169,11 @@ function Sidebar({
   useEffect(() => {
     const query = searchQuery.trim();
 
-    if (!query || !activeWorkspaceId) {
+    if (!query || (searchScope === "workspace" && !activeWorkspaceId)) {
       setProjectSearchResults([]);
       setCardResults([]);
       setCommentSearchResults([]);
+      setGithubEventSearchResults([]);
       setSearchError("");
       setIsSearching(false);
       return;
@@ -164,7 +186,13 @@ function Sidebar({
         setIsSearching(true);
         setSearchError("");
 
-        const result = await searchWorkspace(activeWorkspaceId, query, 10);
+        const result = await searchWorkspace(
+          searchScope === "all" ? null : activeWorkspaceId,
+          query,
+          10,
+          searchScope,
+          includeArchivedSearch,
+        );
 
         if (isCancelled) {
           return;
@@ -173,6 +201,7 @@ function Sidebar({
         setProjectSearchResults(result.projects ?? []);
         setCardResults(result.cards ?? []);
         setCommentSearchResults(result.comments ?? []);
+        setGithubEventSearchResults(result.github_events ?? []);
       } catch (error) {
         if (isCancelled) {
           return;
@@ -181,6 +210,7 @@ function Sidebar({
         setProjectSearchResults([]);
         setCardResults([]);
         setCommentSearchResults([]);
+        setGithubEventSearchResults([]);
 
         setSearchError(
           error instanceof Error ? error.message : "Unable to search.",
@@ -196,7 +226,7 @@ function Sidebar({
       isCancelled = true;
       window.clearTimeout(timeoutId);
     };
-  }, [activeWorkspaceId, searchQuery]);
+  }, [activeWorkspaceId, includeArchivedSearch, searchQuery, searchScope]);
 
   function closeSearch() {
     setIsSearchOpen(false);
@@ -204,8 +234,24 @@ function Sidebar({
     setProjectSearchResults([]);
     setCardResults([]);
     setCommentSearchResults([]);
+    setGithubEventSearchResults([]);
     setSearchError("");
     setIsSearching(false);
+  }
+
+  function formatSearchDate(value) {
+    if (!value) {
+      return "";
+    }
+
+    return new Intl.DateTimeFormat(undefined, {
+      dateStyle: "medium",
+      timeStyle: "short",
+    }).format(new Date(value));
+  }
+
+  function searchNeedsWorkspaceMessage() {
+    return searchScope === "workspace" && !activeWorkspaceId;
   }
 
   return (
@@ -264,6 +310,35 @@ function Sidebar({
               />
             </label>
 
+            <div className="sidebar-search-scope" aria-label="Search scope">
+              <button
+                className={searchScope === "workspace" ? "is-active" : ""}
+                type="button"
+                onClick={() => setSearchScope("workspace")}
+              >
+                Current workspace
+              </button>
+
+              <button
+                className={searchScope === "all" ? "is-active" : ""}
+                type="button"
+                onClick={() => setSearchScope("all")}
+              >
+                All workspaces
+              </button>
+            </div>
+
+            <label className="sidebar-search-archived-toggle">
+              <input
+                type="checkbox"
+                checked={includeArchivedSearch}
+                onChange={(event) =>
+                  setIncludeArchivedSearch(event.target.checked)
+                }
+              />
+              <span>Include archived</span>
+            </label>
+
             <div className="sidebar-search-results">
               <section>
                 <h3>Workspaces</h3>
@@ -281,6 +356,9 @@ function Sidebar({
                       <span className="search-result-type">Workspace</span>
 
                       <strong>{workspace.name}</strong>
+                      {workspace.archived ? (
+                        <span className="search-result-badge">Archived</span>
+                      ) : null}
                     </button>
                   ))
                 ) : (
@@ -291,7 +369,7 @@ function Sidebar({
               <section>
                 <h3>Projects</h3>
 
-                {!activeWorkspaceId ? (
+                {searchNeedsWorkspaceMessage() ? (
                   <p>Open a workspace to search projects.</p>
                 ) : !normalizedSearchQuery ? (
                   <p>Type to search projects.</p>
@@ -314,6 +392,9 @@ function Sidebar({
                       </span>
 
                       <strong>{project.name}</strong>
+                      {project.archived || project.workspace_archived ? (
+                        <span className="search-result-badge">Archived</span>
+                      ) : null}
                       {project.description ? (
                         <span className="search-result-snippet">
                           {project.description}
@@ -329,7 +410,7 @@ function Sidebar({
               <section>
                 <h3>Cards</h3>
 
-                {!activeWorkspaceId ? (
+                {searchNeedsWorkspaceMessage() ? (
                   <p>Open a workspace to search cards.</p>
                 ) : !normalizedSearchQuery ? (
                   <p>Type to search cards.</p>
@@ -347,12 +428,24 @@ function Sidebar({
                         closeSearch();
                       }}
                     >
-                      <span className="search-result-type">{card.status}</span>
+                      <span className="search-result-type">
+                        {card.display_id ?? "Card"}
+                      </span>
 
                       <strong>{card.title}</strong>
-                      {card.display_id ? (
+                      {card.archived ||
+                      card.project_archived ||
+                      card.workspace_archived ? (
+                        <span className="search-result-badge">Archived</span>
+                      ) : null}
+                      {card.status ? (
                         <span className="search-result-snippet">
-                          {card.display_id}
+                          Status: {card.status}
+                        </span>
+                      ) : null}
+                      {card.label_names ? (
+                        <span className="search-result-snippet">
+                          Labels: {card.label_names}
                         </span>
                       ) : null}
                     </button>
@@ -365,7 +458,7 @@ function Sidebar({
               <section>
                 <h3>Comments</h3>
 
-                {!activeWorkspaceId ? (
+                {searchNeedsWorkspaceMessage() ? (
                   <p>Open a workspace to search comments.</p>
                 ) : !normalizedSearchQuery ? (
                   <p>Type to search comments.</p>
@@ -383,6 +476,8 @@ function Sidebar({
                           id: comment.card_id,
                           workspace_id: comment.workspace_id,
                           project_id: comment.project_id,
+                          focus: "comments",
+                          commentId: comment.id,
                         });
                         closeSearch();
                       }}
@@ -392,13 +487,81 @@ function Sidebar({
                       </span>
 
                       <strong>{comment.body}</strong>
+                      {comment.card_archived ||
+                      comment.project_archived ||
+                      comment.workspace_archived ? (
+                        <span className="search-result-badge">Archived</span>
+                      ) : null}
                       <span className="search-result-snippet">
                         {comment.author_name}
+                        {comment.created_at
+                          ? ` · ${formatSearchDate(comment.created_at)}`
+                          : ""}
                       </span>
                     </button>
                   ))
                 ) : (
                   <p>No matching comments.</p>
+                )}
+              </section>
+
+              <section>
+                <h3>GitHub Events</h3>
+
+                {searchNeedsWorkspaceMessage() ? (
+                  <p>Open a workspace to search GitHub events.</p>
+                ) : !normalizedSearchQuery ? (
+                  <p>Type to search GitHub events.</p>
+                ) : isSearching ? (
+                  <p>Searching GitHub events...</p>
+                ) : searchError ? (
+                  <p>{searchError}</p>
+                ) : githubEventSearchResults.length > 0 ? (
+                  githubEventSearchResults.map((event) => (
+                    <button
+                      type="button"
+                      key={event.id}
+                      onClick={() => {
+                        onOpenCard({
+                          id: event.card_id,
+                          workspace_id: event.workspace_id,
+                          project_id: event.project_id,
+                          focus: "development",
+                          githubEventId: event.id,
+                        });
+                        closeSearch();
+                      }}
+                    >
+                      <span className="search-result-type">
+                        {event.repo_full_name ??
+                          [event.repo_owner, event.repo_name]
+                            .filter(Boolean)
+                            .join("/")}
+                      </span>
+
+                      <strong>
+                        {event.title || event.message || event.event_type}
+                      </strong>
+                      {event.card_archived ||
+                      event.project_archived ||
+                      event.workspace_archived ? (
+                        <span className="search-result-badge">Archived</span>
+                      ) : null}
+                      <span className="search-result-snippet">
+                        {[
+                          event.card_title,
+                          event.sender_login,
+                          event.created_at
+                            ? formatSearchDate(event.created_at)
+                            : null,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p>No matching GitHub events.</p>
                 )}
               </section>
             </div>

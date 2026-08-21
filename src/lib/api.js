@@ -340,12 +340,23 @@ export async function searchCards(workspaceId, query, limit = 10) {
   return apiFetch(`/search/cards?${params.toString()}`);
 }
 
-export async function searchWorkspace(workspaceId, query, limit = 10) {
+export async function searchWorkspace(
+  workspaceId,
+  query,
+  limit = 10,
+  scope = "workspace",
+  includeArchived = false,
+) {
   const params = new URLSearchParams({
-    workspace_id: String(workspaceId),
     q: query,
     limit: String(limit),
+    scope,
+    include_archived: String(includeArchived),
   });
+
+  if (workspaceId) {
+    params.set("workspace_id", String(workspaceId));
+  }
 
   return apiFetch(`/search?${params.toString()}`);
 }

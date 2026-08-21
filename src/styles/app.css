@@ -203,6 +203,15 @@ body.is-resizing-sidebar {
   font-size: 13px;
 }
 
+.search-result-snippet {
+  overflow: hidden;
+  color: #626f86;
+  font-size: 12px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .search-result-type,
 .sidebar-search-results p {
   margin: 0;

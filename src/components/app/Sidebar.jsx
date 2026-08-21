@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 
-import { searchCards } from "../../lib/api.js";
+import { searchWorkspace } from "../../lib/api.js";
 import CreateWorkspaceModal from "../workspace/CreateWorkspaceModal.jsx";
 
 function WorkspaceNavGroup({
@@ -96,9 +96,11 @@ function Sidebar({
   const [isCreatingWorkspace, setIsCreatingWorkspace] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [projectSearchResults, setProjectSearchResults] = useState([]);
   const [cardResults, setCardResults] = useState([]);
-  const [isSearchingCards, setIsSearchingCards] = useState(false);
-  const [cardSearchError, setCardSearchError] = useState("");
+  const [commentSearchResults, setCommentSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchError, setSearchError] = useState("");
 
   const userMenuRef = useRef(null);
   const searchRef = useRef(null);
@@ -109,20 +111,6 @@ function Sidebar({
 
   const workspaceResults = workspaces.filter((workspace) =>
     workspace.name.toLowerCase().includes(normalizedSearchQuery),
-  );
-
-  const projectResults = [...workspaces, ...guestWorkspaces].flatMap(
-    (workspace) =>
-      (workspace.projects ?? [])
-        .filter((project) =>
-          `${project.name} ${workspace.name}`
-            .toLowerCase()
-            .includes(normalizedSearchQuery),
-        )
-        .map((project) => ({
-          ...project,
-          workspaceName: workspace.name,
-        })),
   );
 
   useEffect(() => {
@@ -161,9 +149,11 @@ function Sidebar({
     const query = searchQuery.trim();
 
     if (!query || !activeWorkspaceId) {
+      setProjectSearchResults([]);
       setCardResults([]);
-      setCardSearchError("");
-      setIsSearchingCards(false);
+      setCommentSearchResults([]);
+      setSearchError("");
+      setIsSearching(false);
       return;
     }
 
@@ -171,29 +161,33 @@ function Sidebar({
 
     const timeoutId = window.setTimeout(async () => {
       try {
-        setIsSearchingCards(true);
-        setCardSearchError("");
+        setIsSearching(true);
+        setSearchError("");
 
-        const result = await searchCards(activeWorkspaceId, query, 10);
+        const result = await searchWorkspace(activeWorkspaceId, query, 10);
 
         if (isCancelled) {
           return;
         }
 
-        setCardResults(result.items ?? []);
+        setProjectSearchResults(result.projects ?? []);
+        setCardResults(result.cards ?? []);
+        setCommentSearchResults(result.comments ?? []);
       } catch (error) {
         if (isCancelled) {
           return;
         }
 
+        setProjectSearchResults([]);
         setCardResults([]);
+        setCommentSearchResults([]);
 
-        setCardSearchError(
-          error instanceof Error ? error.message : "Unable to search cards.",
+        setSearchError(
+          error instanceof Error ? error.message : "Unable to search.",
         );
       } finally {
         if (!isCancelled) {
-          setIsSearchingCards(false);
+          setIsSearching(false);
         }
       }
     }, 300);
@@ -207,9 +201,11 @@ function Sidebar({
   function closeSearch() {
     setIsSearchOpen(false);
     setSearchQuery("");
+    setProjectSearchResults([]);
     setCardResults([]);
-    setCardSearchError("");
-    setIsSearchingCards(false);
+    setCommentSearchResults([]);
+    setSearchError("");
+    setIsSearching(false);
   }
 
   return (
@@ -295,8 +291,16 @@ function Sidebar({
               <section>
                 <h3>Projects</h3>
 
-                {projectResults.length > 0 ? (
-                  projectResults.map((project) => (
+                {!activeWorkspaceId ? (
+                  <p>Open a workspace to search projects.</p>
+                ) : !normalizedSearchQuery ? (
+                  <p>Type to search projects.</p>
+                ) : isSearching ? (
+                  <p>Searching projects...</p>
+                ) : searchError ? (
+                  <p>{searchError}</p>
+                ) : projectSearchResults.length > 0 ? (
+                  projectSearchResults.map((project) => (
                     <button
                       type="button"
                       key={project.id}
@@ -306,10 +310,15 @@ function Sidebar({
                       }}
                     >
                       <span className="search-result-type">
-                        {project.workspaceName}
+                        {project.workspace_name}
                       </span>
 
                       <strong>{project.name}</strong>
+                      {project.description ? (
+                        <span className="search-result-snippet">
+                          {project.description}
+                        </span>
+                      ) : null}
                     </button>
                   ))
                 ) : (
@@ -324,10 +333,10 @@ function Sidebar({
                   <p>Open a workspace to search cards.</p>
                 ) : !normalizedSearchQuery ? (
                   <p>Type to search cards.</p>
-                ) : isSearchingCards ? (
+                ) : isSearching ? (
                   <p>Searching cards...</p>
-                ) : cardSearchError ? (
-                  <p>{cardSearchError}</p>
+                ) : searchError ? (
+                  <p>{searchError}</p>
                 ) : cardResults.length > 0 ? (
                   cardResults.map((card) => (
                     <button
@@ -341,10 +350,55 @@ function Sidebar({
                       <span className="search-result-type">{card.status}</span>
 
                       <strong>{card.title}</strong>
+                      {card.display_id ? (
+                        <span className="search-result-snippet">
+                          {card.display_id}
+                        </span>
+                      ) : null}
                     </button>
                   ))
                 ) : (
                   <p>No matching cards.</p>
+                )}
+              </section>
+
+              <section>
+                <h3>Comments</h3>
+
+                {!activeWorkspaceId ? (
+                  <p>Open a workspace to search comments.</p>
+                ) : !normalizedSearchQuery ? (
+                  <p>Type to search comments.</p>
+                ) : isSearching ? (
+                  <p>Searching comments...</p>
+                ) : searchError ? (
+                  <p>{searchError}</p>
+                ) : commentSearchResults.length > 0 ? (
+                  commentSearchResults.map((comment) => (
+                    <button
+                      type="button"
+                      key={comment.id}
+                      onClick={() => {
+                        onOpenCard({
+                          id: comment.card_id,
+                          workspace_id: comment.workspace_id,
+                          project_id: comment.project_id,
+                        });
+                        closeSearch();
+                      }}
+                    >
+                      <span className="search-result-type">
+                        {comment.card_title}
+                      </span>
+
+                      <strong>{comment.body}</strong>
+                      <span className="search-result-snippet">
+                        {comment.author_name}
+                      </span>
+                    </button>
+                  ))
+                ) : (
+                  <p>No matching comments.</p>
                 )}
               </section>
             </div>

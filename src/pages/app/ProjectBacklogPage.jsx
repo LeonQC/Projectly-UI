@@ -124,6 +124,9 @@ function ProjectBacklogPage({
   canManageWorkspace = true,
   currentUserId,
   initialCardId,
+  initialCommentId,
+  initialFocus,
+  initialGithubEventId,
   onArchiveProject,
   onCloseCardRoute,
   onOpenCardRoute,
@@ -163,6 +166,7 @@ function ProjectBacklogPage({
   }, [activeTab, canManageWorkspace]);
   const [isCreatingCard, setIsCreatingCard] = useState(false);
   const [selectedCard, setSelectedCard] = useState(null);
+  const [selectedCardFocus, setSelectedCardFocus] = useState(null);
   const [projectStatuses, setProjectStatuses] = useState(cardStatuses);
   const [archivedStatusValues, setArchivedStatusValues] = useState([]);
   const sprintMenuRef = useRef(null);
@@ -728,17 +732,20 @@ function ProjectBacklogPage({
 
   function openCard(card) {
     setSelectedCard(card);
+    setSelectedCardFocus(null);
     onOpenCardRoute?.(card.id);
   }
 
   function closeCard() {
     setSelectedCard(null);
+    setSelectedCardFocus(null);
     onCloseCardRoute?.();
   }
 
   useEffect(() => {
     if (!initialCardId) {
       setSelectedCard(null);
+      setSelectedCardFocus(null);
       return;
     }
 
@@ -747,10 +754,36 @@ function ProjectBacklogPage({
     }
 
     const routeCard = findCardById(initialCardId);
-    if (routeCard && !isSameId(selectedCard?.id, routeCard.id)) {
+    const routeFocus = initialFocus
+      ? {
+          section: initialFocus,
+          commentId: initialCommentId,
+          githubEventId: initialGithubEventId,
+        }
+      : null;
+
+    const selectedFocusKey = JSON.stringify(selectedCardFocus);
+    const routeFocusKey = JSON.stringify(routeFocus);
+
+    if (
+      routeCard &&
+      (!isSameId(selectedCard?.id, routeCard.id) ||
+        selectedFocusKey !== routeFocusKey)
+    ) {
       setSelectedCard(routeCard);
+      setSelectedCardFocus(routeFocus);
     }
-  }, [createdCards, initialCardId, isLoadingEpics, localEpics, selectedCard?.id]);
+  }, [
+    createdCards,
+    initialCardId,
+    initialCommentId,
+    initialFocus,
+    initialGithubEventId,
+    isLoadingEpics,
+    localEpics,
+    selectedCard?.id,
+    selectedCardFocus,
+  ]);
 
   function applyCardUpdate(cardId, updates) {
     setCreatedCards((cards) =>
@@ -1360,6 +1393,7 @@ function ProjectBacklogPage({
       {selectedCard && (
         <CardDetailModal
           card={selectedCard}
+          focusTarget={selectedCardFocus}
           linkedWorkItemOptions={linkedWorkItemOptions}
           onArchiveCard={archiveCard}
           onClose={closeCard}

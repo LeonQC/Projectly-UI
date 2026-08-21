@@ -192,6 +192,7 @@ function mapDetailLink(link, cardId) {
 
 function CardDetailModal({
   card,
+  focusTarget = null,
   linkedWorkItemOptions = [],
   onArchiveCard,
   onClose,
@@ -234,6 +235,8 @@ function CardDetailModal({
   const [commentAttachments, setCommentAttachments] = useState([]);
   const [comments, setComments] = useState([]);
   const [githubEvents, setGithubEvents] = useState(null);
+  const [highlightedCommentId, setHighlightedCommentId] = useState(null);
+  const [highlightedGithubEventId, setHighlightedGithubEventId] = useState(null);
   const [githubInstallations, setGithubInstallations] = useState([]);
   const [isLoadingGithubInstallations, setIsLoadingGithubInstallations] = useState(false);
   const [githubInstallationError, setGithubInstallationError] = useState("");
@@ -248,6 +251,10 @@ function CardDetailModal({
   const labelRemoveRef = useRef(null);
   const commentInputRef = useRef(null);
   const commentEditorRef = useRef(null);
+  const commentsSectionRef = useRef(null);
+  const developmentSectionRef = useRef(null);
+  const highlightedCommentRef = useRef(null);
+  const highlightedGithubEventRef = useRef(null);
   const attachmentInputRef = useRef(null);
   const cardAttachmentInputRef = useRef(null);
   const displayCard = detailCard ?? card;
@@ -726,6 +733,45 @@ function CardDetailModal({
   }, [card.id]);
 
   useEffect(() => {
+    if (!focusTarget || isLoadingDetail) {
+      return undefined;
+    }
+
+    if (focusTarget.section === "comments") {
+      setHighlightedCommentId(focusTarget.commentId ?? null);
+      setHighlightedGithubEventId(null);
+    }
+
+    if (focusTarget.section === "development") {
+      setHighlightedGithubEventId(focusTarget.githubEventId ?? null);
+      setHighlightedCommentId(null);
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      if (focusTarget.section === "comments") {
+        (highlightedCommentRef.current ?? commentsSectionRef.current)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+
+      if (focusTarget.section === "development") {
+        (highlightedGithubEventRef.current ?? developmentSectionRef.current)?.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+        });
+      }
+    }, 150);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [
+    comments.length,
+    focusTarget,
+    githubEvents?.events?.length,
+    isLoadingDetail,
+  ]);
+
+  useEffect(() => {
     let isMounted = true;
 
     async function loadGithubInstallations() {
@@ -1183,7 +1229,7 @@ function CardDetailModal({
               />
             </section>
 
-            <section className="card-development-section">
+            <section className="card-development-section" ref={developmentSectionRef}>
               <header>
                 <h3>Development</h3>
               </header>
@@ -1226,10 +1272,20 @@ function CardDetailModal({
                         <h4>GitHub events</h4>
                         {githubEvents.events.map((event) => (
                           <a
+                            className={
+                              String(highlightedGithubEventId) === String(event.id)
+                                ? "is-highlighted"
+                                : ""
+                            }
                             href={event.url || `https://github.com/${event.repo_owner}/${event.repo_name}`}
                             target="_blank"
                             rel="noreferrer"
                             key={event.id}
+                            ref={
+                              String(highlightedGithubEventId) === String(event.id)
+                                ? highlightedGithubEventRef
+                                : null
+                            }
                           >
                             <strong>{getGitHubEventLabel(event)} · {getGitHubEventTitle(event)}</strong>
                             <span>{getGitHubEventMeta(event)}</span>
@@ -1246,7 +1302,7 @@ function CardDetailModal({
           </section>
 
           <aside className="card-detail-side">
-            <section className="comments-activity-panel">
+            <section className="comments-activity-panel" ref={commentsSectionRef}>
               <header>
                 <h3>Comments</h3>
               </header>
@@ -1354,7 +1410,19 @@ function CardDetailModal({
               <div className="comment-feed">
                 {comments.length > 0 ? (
                   comments.map((comment) => (
-                    <article className="comment-item" key={comment.id}>
+                    <article
+                      className={`comment-item ${
+                        String(highlightedCommentId) === String(comment.id)
+                          ? "is-highlighted"
+                          : ""
+                      }`}
+                      key={comment.id}
+                      ref={
+                        String(highlightedCommentId) === String(comment.id)
+                          ? highlightedCommentRef
+                          : null
+                      }
+                    >
                       <span className="member-avatar">{comment.author.initials}</span>
                       <div>
                         <header>

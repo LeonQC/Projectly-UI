@@ -340,6 +340,16 @@ export async function searchCards(workspaceId, query, limit = 10) {
   return apiFetch(`/search/cards?${params.toString()}`);
 }
 
+export async function searchWorkspace(workspaceId, query, limit = 10) {
+  const params = new URLSearchParams({
+    workspace_id: String(workspaceId),
+    q: query,
+    limit: String(limit),
+  });
+
+  return apiFetch(`/search?${params.toString()}`);
+}
+
 export async function listProjectCards(projectId) {
   const payload = await apiFetch(`/projects/${projectId}/cards`);
   return payload.data;
